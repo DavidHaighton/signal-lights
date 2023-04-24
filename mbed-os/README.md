@@ -1,12 +1,15 @@
 [![Mbed OS][mbed-os-logo]][mbed-os-link]
 
-[![Build status master][mbed-master-svg]][mbed-master]
+[![Build status release][mbed-travis-release-svg]][mbed-travis-release]
+[![Build status master][mbed-travis-master-svg]][mbed-travis-master]
 [![Tools coverage status][mbed-coveralls-tools-svg]][mbed-coveralls-tools]
 
 [mbed-os-logo]: logo.png
 [mbed-os-link]: https://www.mbed.com/en/platform/mbed-os/
-[mbed-master]: https://github.com/ARMmbed/mbed-os/actions/workflows/basic_checks.yml
-[mbed-master-svg]: https://github.com/ARMmbed/mbed-os/actions/workflows/basic_checks.yml/badge.svg
+[mbed-travis-master]: https://travis-ci.org/ARMmbed/mbed-os
+[mbed-travis-master-svg]: https://travis-ci.org/ARMmbed/mbed-os.svg?branch=master
+[mbed-travis-release]: https://travis-ci.org/ARMmbed/mbed-os/branches
+[mbed-travis-release-svg]: https://travis-ci.org/ARMmbed/mbed-os.svg?branch=latest
 [mbed-coveralls-tools]: https://coveralls.io/github/ARMmbed/mbed-os?branch=master
 [mbed-coveralls-tools-svg]: https://coveralls.io/repos/github/ARMmbed/mbed-os/badge.svg?branch=master
 

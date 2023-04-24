@@ -1,6 +1,5 @@
 /* mbed Microcontroller Library
  * Copyright (c) 2006-2013 ARM Limited
- * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,15 +31,14 @@
 #define IRQ_FALLING_EDGE   (3)
 #define IRQ_EITHER_EDGE    (4)
 
-static uintptr_t channel_contexts[CHANNEL_NUM] = {0};
+static uint32_t channel_ids[CHANNEL_NUM] = {0};
 
 static gpio_irq_handler irq_handler;
 
 static GPIO_Type * const gpio_addrs[] = GPIO_BASE_PTRS;
 
 /* Array of PORT IRQ number. */
-static const IRQn_Type gpio_low_irqs[] = GPIO_COMBINED_LOW_IRQS;
-static const IRQn_Type gpio_high_irqs[] = GPIO_COMBINED_HIGH_IRQS;
+static const IRQn_Type gpio_irqs[] = GPIO_COMBINED_IRQS;
 
 static void handle_interrupt_in(PortName port, int ch_base)
 {
@@ -52,7 +50,7 @@ static void handle_interrupt_in(PortName port, int ch_base)
 
     for (i = 0; i < 32; i++) {
         if (interrupt_flags & (1 << i)) {
-            uint32_t id = channel_contexts[ch_base + i];
+            uint32_t id = channel_ids[ch_base + i];
             if (id == 0) {
                 continue;
             }
@@ -117,8 +115,10 @@ void gpio5_irq(void)
     handle_interrupt_in(Gpio5, 128);
 }
 
-int gpio_irq_init(gpio_irq_t *obj, PinName pin, gpio_irq_handler handler, uintptr_t context)
+int gpio_irq_init(gpio_irq_t *obj, PinName pin, gpio_irq_handler handler, uint32_t id)
 {
+    uint32_t int_index;
+
     if (pin == NC) {
         return -1;
     }
@@ -156,23 +156,23 @@ int gpio_irq_init(gpio_irq_t *obj, PinName pin, gpio_irq_handler handler, uintpt
             break;
     }
 
+    int_index = 2 * obj->port;
     if (obj->pin > 15) {
-        NVIC_SetVector(gpio_high_irqs[obj->port], vector);
-        NVIC_EnableIRQ(gpio_high_irqs[obj->port]);
-    } else {
-        NVIC_SetVector(gpio_low_irqs[obj->port], vector);
-        NVIC_EnableIRQ(gpio_low_irqs[obj->port]);
+        int_index -= 1;
     }
 
+    NVIC_SetVector(gpio_irqs[int_index], vector);
+    NVIC_EnableIRQ(gpio_irqs[int_index]);
+
     obj->ch = ch_base + obj->pin;
-    channel_contexts[obj->ch] = context;
+    channel_ids[obj->ch] = id;
 
     return 0;
 }
 
 void gpio_irq_free(gpio_irq_t *obj)
 {
-    channel_contexts[obj->ch] = 0;
+    channel_ids[obj->ch] = 0;
 }
 
 void gpio_irq_set(gpio_irq_t *obj, gpio_irq_event event, uint32_t enable)
@@ -243,20 +243,12 @@ void gpio_irq_set(gpio_irq_t *obj, gpio_irq_event event, uint32_t enable)
 
 void gpio_irq_enable(gpio_irq_t *obj)
 {
-    if (obj->pin > 15) {
-        NVIC_EnableIRQ(gpio_high_irqs[obj->port]);
-    } else {
-        NVIC_EnableIRQ(gpio_low_irqs[obj->port]);
-    }
+    NVIC_EnableIRQ(gpio_irqs[obj->port]);
 }
 
 void gpio_irq_disable(gpio_irq_t *obj)
 {
-    if (obj->pin > 15) {
-        NVIC_DisableIRQ(gpio_high_irqs[obj->port]);
-    } else {
-        NVIC_DisableIRQ(gpio_low_irqs[obj->port]);
-    }
+    NVIC_DisableIRQ(gpio_irqs[obj->port]);
 }
 
 #endif

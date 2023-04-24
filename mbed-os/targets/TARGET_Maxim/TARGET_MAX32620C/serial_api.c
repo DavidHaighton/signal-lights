@@ -418,8 +418,3 @@ const PinMap *serial_rts_pinmap()
 {
     return PinMap_UART_RTS;
 }
-
-void serial_free(serial_t *obj)
-{
-    // Not implemented
-}

@@ -22,10 +22,12 @@
 struct Delayer: public cadmium::Atomic<DelayerState> {
         cadmium::Port<bool> out;
         cadmium::Port<bool> in;
+        double delay;
 
-        Delayer(): Atomic<DelayerState>("Delayer", DelayerState()) {
+        explicit Delayer(const std::string& name, double d): Atomic<DelayerState>(name, DelayerState()) {
             out = addOutPort<bool>("out");
             in = addInPort<bool>("in");
+            this->delay = d;
         }
 
 
@@ -36,7 +38,6 @@ struct Delayer: public cadmium::Atomic<DelayerState> {
 
         void externalTransition(DelayerState& state, double e) const override {
             state.q.emplace(in->getBag()[0]);
-            printf("Hello EXTERNAL");
         }
 
         void output(const DelayerState& state) const override {
@@ -45,6 +46,6 @@ struct Delayer: public cadmium::Atomic<DelayerState> {
 
 
         [[nodiscard]] double timeAdvance(const DelayerState& state) const override {
-            return state.q.empty()?std::numeric_limits<double>::infinity():1;
+            return state.q.empty()?std::numeric_limits<double>::infinity():delay;
         }
     };

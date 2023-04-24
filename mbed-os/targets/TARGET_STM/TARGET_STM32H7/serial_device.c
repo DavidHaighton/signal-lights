@@ -1,28 +1,38 @@
 /* mbed Microcontroller Library
- * SPDX-License-Identifier: BSD-3-Clause
- ******************************************************************************
- *
- * Copyright (c) 2015-2020 STMicroelectronics.
+ *******************************************************************************
+ * Copyright (c) 2017, STMicroelectronics
  * All rights reserved.
  *
- * This software component is licensed by ST under BSD 3-Clause license,
- * the "License"; You may not use this file except in compliance with the
- * License. You may obtain a copy of the License at:
- *                        opensource.org/licenses/BSD-3-Clause
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
  *
- ******************************************************************************
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ * 3. Neither the name of STMicroelectronics nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *******************************************************************************
  */
 
 #if DEVICE_SERIAL
 
 #include "serial_api_hal.h"
 
-#if defined (STM32h742xx) || defined (STM32h743xx) || defined (STM32h745xx) || defined (STM32h747xx) || defined (STM32h750xx) || defined (STM32h753xx) || defined (STM32h755xx) || defined (STM32h757xx)
 #define UART_NUM (9)
-#else
-#define UART_NUM (11)
-#endif
-
 uint32_t serial_irq_ids[UART_NUM] = {0};
 UART_HandleTypeDef uart_handlers[UART_NUM];
 
@@ -118,20 +128,6 @@ static void uart8_irq(void)
 }
 #endif
 
-#if defined(UART9_BASE)
-static void uart9_irq(void)
-{
-    uart_irq(UART_9);
-}
-#endif
-
-#if defined(USART10_BASE)
-static void uart10_irq(void)
-{
-    uart_irq(UART_10);
-}
-#endif
-
 #if defined(LPUART1_BASE)
 static void lpuart1_irq(void)
 {
@@ -203,18 +199,6 @@ void serial_irq_set(serial_t *obj, SerialIrq irq, uint32_t enable)
             vector = (uint32_t)&uart8_irq;
             break;
 #endif
-#if defined(UART9_BASE)
-        case UART_9:
-            irq_n = UART9_IRQn;
-            vector = (uint32_t)&uart9_irq;
-            break;
-#endif
-#if defined(USART10_BASE)
-        case UART_10:
-            irq_n = USART10_IRQn;
-            vector = (uint32_t)&uart10_irq;
-            break;
-#endif
 #if defined(LPUART1_BASE)
         case LPUART_1:
             irq_n = LPUART1_IRQn;
@@ -263,15 +247,8 @@ int serial_getc(serial_t *obj)
     struct serial_s *obj_s = SERIAL_S(obj);
     UART_HandleTypeDef *huart = &uart_handlers[obj_s->index];
 
-    /* Computation of UART mask to apply to RDR register */
-    UART_MASK_COMPUTATION(huart);
-    uint16_t uhMask = huart->Mask;
-
     while (!serial_readable(obj));
-    /* When receiving with the parity enabled, the value read in the MSB bit
-     * is the received parity bit.
-     */
-    return (int)(huart->Instance->RDR & uhMask);
+    return (int)(huart->Instance->RDR & 0x1FF);
 }
 
 void serial_putc(serial_t *obj, int c)
@@ -280,12 +257,7 @@ void serial_putc(serial_t *obj, int c)
     UART_HandleTypeDef *huart = &uart_handlers[obj_s->index];
 
     while (!serial_writable(obj));
-    /* When transmitting with the parity enabled (PCE bit set to 1 in the
-     * USART_CR1 register), the value written in the MSB (bit 7 or bit 8
-     * depending on the data length) has no effect because it is replaced
-     * by the parity.
-     */
-    huart->Instance->TDR = (uint16_t)(c & 0x1FFU);
+    huart->Instance->TDR = (uint32_t)(c & 0x1FF);
 }
 
 void serial_clear(serial_t *obj)
@@ -293,9 +265,8 @@ void serial_clear(serial_t *obj)
     struct serial_s *obj_s = SERIAL_S(obj);
     UART_HandleTypeDef *huart = &uart_handlers[obj_s->index];
 
-    /* Clear RXNE and error flags */
-    volatile uint32_t tmpval __attribute__((unused)) = huart->Instance->RDR;
-    HAL_UART_ErrorCallback(huart);
+    __HAL_UART_CLEAR_IT(huart, UART_FLAG_TXE);
+    __HAL_UART_CLEAR_IT(huart, UART_FLAG_RXNE);
 }
 
 void serial_break_set(serial_t *obj)
@@ -423,16 +394,6 @@ static IRQn_Type serial_get_irq_n(UARTName uart_name)
 #if defined(UART8_BASE)
         case UART_8:
             irq_n = UART8_IRQn;
-            break;
-#endif
-#if defined(UART9_BASE)
-        case UART_9:
-            irq_n = UART9_IRQn;
-            break;
-#endif
-#if defined(USART10_BASE)
-        case UART_10:
-            irq_n = USART10_IRQn;
             break;
 #endif
         default:
@@ -576,6 +537,13 @@ uint8_t serial_rx_active(serial_t *obj)
     return (((HAL_UART_GetState(huart) & HAL_UART_STATE_BUSY_RX) == HAL_UART_STATE_BUSY_RX) ? 1 : 0);
 }
 
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+    if (__HAL_UART_GET_FLAG(huart, UART_FLAG_TC) != RESET) {
+        __HAL_UART_CLEAR_IT(huart, UART_CLEAR_TCF);
+    }
+}
+
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
     if (__HAL_UART_GET_FLAG(huart, UART_FLAG_PE) != RESET) {
@@ -683,6 +651,9 @@ void serial_tx_abort_asynch(serial_t *obj)
 
     __HAL_UART_DISABLE_IT(huart, UART_IT_TC);
     __HAL_UART_DISABLE_IT(huart, UART_IT_TXE);
+
+    // clear flags
+    __HAL_UART_CLEAR_IT(huart, UART_FLAG_TC);
 
     // reset states
     huart->TxXferCount = 0;

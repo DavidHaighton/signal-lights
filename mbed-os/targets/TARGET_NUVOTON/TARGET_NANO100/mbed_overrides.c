@@ -33,42 +33,24 @@ void mbed_sdk_init(void)
 
     /* Enable HIRC clock (internal OSC 12MHz) */
     CLK_EnableXtalRC(CLK_PWRCTL_HIRC_EN_Msk);
-#if MBED_CONF_TARGET_HXT_PRESENT
     /* Enable HXT clock (external XTAL 12MHz) */
     CLK_EnableXtalRC(CLK_PWRCTL_HXT_EN_Msk);
-#else
-    /* Disable HXT clock (external XTAL 12MHz) */
-    CLK_DisableXtalRC(CLK_PWRCTL_HXT_EN_Msk);
-#endif
-    /* Enable LIRC clock (OSC 10KHz) */
+    /* Enable LIRC clock (OSC 10KHz) for lp_ticker */
     CLK_EnableXtalRC(CLK_PWRCTL_LIRC_EN_Msk);
-#if MBED_CONF_TARGET_LXT_PRESENT
-    /* Enable LXT clock (XTAL 32KHz) */
+    /* Enable LXT clock (XTAL 32KHz) for RTC */
     CLK_EnableXtalRC(CLK_PWRCTL_LXT_EN_Msk);
-#else
-    /* Disable LXT clock (XTAL 32KHz) */
-    CLK_DisableXtalRC(CLK_PWRCTL_LXT_EN_Msk);
-#endif
 
     /* Wait for HIRC clock ready */
     CLK_WaitClockReady(CLK_CLKSTATUS_HIRC_STB_Msk);
-#if MBED_CONF_TARGET_HXT_PRESENT
     /* Wait for HXT clock ready */
     CLK_WaitClockReady(CLK_CLKSTATUS_HXT_STB_Msk);
-#endif
     /* Wait for LIRC clock ready */
     CLK_WaitClockReady(CLK_CLKSTATUS_LIRC_STB_Msk);
-#if MBED_CONF_TARGET_LXT_PRESENT
     /* Wait for LXT clock ready */
     CLK_WaitClockReady(CLK_CLKSTATUS_LXT_STB_Msk);
-#endif
 
-    /* Set HCLK source form HXT/HIRC and HCLK source divide 1  */
-#if MBED_CONF_TARGET_HXT_PRESENT
+    /* Set HCLK source form HXT and HCLK source divide 1  */
     CLK_SetHCLK(CLK_CLKSEL0_HCLK_S_HXT, CLK_HCLK_CLK_DIVIDER(1));
-#else
-    CLK_SetHCLK(CLK_CLKSEL0_HCLK_S_HIRC, CLK_HCLK_CLK_DIVIDER(1));
-#endif
 
     /* Select HXT/HIRC to clock PLL
      *
@@ -82,7 +64,7 @@ void mbed_sdk_init(void)
      *    T2. <1 ms with HIRC-clocked PLL as HCLK clock source
      *    T1 will fail Greentea test which requires max 10 ms wake-up time.
      *
-     *    If we just call CLK_SetCoreClock(FREQ_48MHZ) to configure HCLK to 48 MHz,
+     *    If we just call CLK_SetCoreClock(FREQ_42MHZ) to configure HCLK to 42 MHz,
      *    it will go T1 with HXT already enabled in front. So we manually configure
      *    it to choose HXT/HIRC-clocked PLL.
      */
@@ -93,15 +75,11 @@ void mbed_sdk_init(void)
 #define NU_CLOCK_PLL    NU_HIRC_PLL
 #endif
 
-#if (NU_CLOCK_PLL == NU_HXT_PLL) && (MBED_CONF_TARGET_HXT_PRESENT == 0)
-#error "HXT is not present to clock PLL"
-#endif
-
 #if (NU_CLOCK_PLL == NU_HXT_PLL)
-    CLK_EnablePLL(CLK_PLLCTL_PLL_SRC_HXT, FREQ_48MHZ*2);
+    CLK_EnablePLL(CLK_PLLCTL_PLL_SRC_HXT, FREQ_42MHZ*2);
     CLK_SetHCLK(CLK_CLKSEL0_HCLK_S_PLL, CLK_HCLK_CLK_DIVIDER(2));
 #elif (NU_CLOCK_PLL == NU_HIRC_PLL)
-    CLK_EnablePLL(CLK_PLLCTL_PLL_SRC_HIRC, FREQ_48MHZ*2);
+    CLK_EnablePLL(CLK_PLLCTL_PLL_SRC_HIRC, FREQ_42MHZ*2);
     CLK_SetHCLK(CLK_CLKSEL0_HCLK_S_PLL, CLK_HCLK_CLK_DIVIDER(2));
 #endif
 

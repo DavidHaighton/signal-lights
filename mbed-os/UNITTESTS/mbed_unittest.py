@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-Copyright (c) 2018-2021, Arm Limited
+Copyright (c) 2018, Arm Limited
 SPDX-License-Identifier: Apache-2.0
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -71,19 +71,18 @@ def _mbed_unittest_test(options, cwd, pwd):
                                  clean=options.clean)
 
     if options.compile_only:
-        # Create makefiles        
-        tool.create_makefiles(path_to_src=cwd,
+        # Create makefiles
+        src_path = os.path.relpath(pwd, options.build)
+        tool.create_makefiles(path_to_src=src_path,
                               generator=options.cmake_generator,
                               coverage_output_type=options.coverage,
-                              debug=options.debug_build,
-                              valgrind=options.valgrind)
+                              debug=options.debug_build)
 
         # Build tests
         tool.build_tests()
 
     if options.run_only:
-        tool.run_tests(filter_regex=options.test_regex,
-                       valgrind=options.valgrind)
+        tool.run_tests(filter_regex=options.test_regex)
 
         # If code coverage generation:
         if options.coverage:
@@ -103,6 +102,7 @@ def _mbed_unittest_test(options, cwd, pwd):
 
             cov_api.generate_reports(outputs=outputs,
                                      excludes=excludes,
+                                     filter_regex=options.test_regex,
                                      build_path=options.build)
 
 def _mbed_unittest_new(options, pwd):

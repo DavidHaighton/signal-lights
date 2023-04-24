@@ -1,6 +1,5 @@
 /* mbed Microcontroller Library
  * Copyright (c) 2006-2013 ARM Limited
- * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,9 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-/* MBED TARGET LIST: HEXIWEAR */
-
 #ifndef MBED_PINNAMES_H
 #define MBED_PINNAMES_H
 
@@ -211,8 +207,8 @@ typedef enum {
     BUTTON3 = PTA15,
 
     // USB Pins
-    CONSOLE_TX = PTB17,
-    CONSOLE_RX = PTB16,
+    USBTX = PTB17,
+    USBRX = PTB16,
 
     I2C_SCL = PTC10,
     I2C_SDA = PTC11,

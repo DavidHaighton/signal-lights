@@ -30,6 +30,8 @@
 ; ownership rights.
 ;*******************************************************************************
 
+__initial_sp        EQU     0x20080000  ; Top of RAM
+
                 PRESERVE8
                 THUMB
 
@@ -40,9 +42,8 @@
                 EXPORT  __Vectors
                 EXPORT  __Vectors_End
                 EXPORT  __Vectors_Size
-                IMPORT  |Image$$ARM_LIB_STACK$$ZI$$Limit|
 
-__Vectors       DCD     |Image$$ARM_LIB_STACK$$ZI$$Limit| ; Top of Stack
+__Vectors       DCD     __initial_sp              ; Top of Stack
                 DCD     Reset_Handler             ; Reset Handler
                 DCD     NMI_Handler               ; NMI Handler
                 DCD     HardFault_Handler         ; Hard Fault Handler
@@ -138,47 +139,47 @@ __SPIN
 
 NMI_Handler             PROC
                         EXPORT NMI_Handler              [WEAK]     
-                        B       .
+                        B       NMI_Handler
                         ENDP
 
 HardFault_Handler       PROC
                         EXPORT HardFault_Handler        [WEAK]             
-                        B       .
+                        B       HardFault_Handler
                         ENDP
 
 MemManage_Handler       PROC
                         EXPORT MemManage_Handler        [WEAK]
-                        B       .
+                        B       MemManage_Handler
                         ENDP
 
 BusFault_Handler        PROC
                         EXPORT BusFault_Handler         [WEAK]
-                        B       .
+                        B       BusFault_Handler
                         ENDP
 
 UsageFault_Handler      PROC
                         EXPORT UsageFault_Handler       [WEAK]
-                        B       .
+                        B       UsageFault_Handler
                         ENDP
 
 SVC_Handler             PROC
                         EXPORT SVC_Handler              [WEAK]
-                        B       .
+                        B       SVC_Handler
                         ENDP
 
 DebugMon_Handler        PROC
                         EXPORT DebugMon_Handler         [WEAK]
-                        B       .
+                        B       DebugMon_Handler
                         ENDP
 
 PendSV_Handler          PROC
                         EXPORT PendSV_Handler           [WEAK]
-                        B       .
+                        B       PendSV_Handler
                         ENDP
 
 SysTick_Handler         PROC
                         EXPORT SysTick_Handler          [WEAK]
-                        B       .
+                        B       SysTick_Handler
                         ENDP
 
 Default_Handler         PROC

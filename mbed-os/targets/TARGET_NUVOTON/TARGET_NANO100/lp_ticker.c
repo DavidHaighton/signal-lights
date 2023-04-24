@@ -29,11 +29,7 @@
 /* Timer clock per lp_ticker tick */
 #define NU_TMRCLK_PER_TICK          1
 /* Timer clock per second */
-#if MBED_CONF_TARGET_LXT_PRESENT
 #define NU_TMRCLK_PER_SEC           (__LXT)
-#else
-#define NU_TMRCLK_PER_SEC           (__LIRC)
-#endif
 /* Timer max counter bit size */
 #define NU_TMR_MAXCNT_BITSIZE       24
 /* Timer max counter */
@@ -44,11 +40,7 @@
 void TMR1_IRQHandler(void);
 
 /* NOTE: To wake the system from power down mode, timer clock source must be ether LXT or LIRC. */
-#if MBED_CONF_TARGET_LXT_PRESENT
 static const struct nu_modinit_s timer1_modinit = {TIMER_1, TMR1_MODULE, CLK_CLKSEL1_TMR1_S_LXT, 0, TMR1_RST, TMR1_IRQn, (void *) TMR1_IRQHandler};
-#else
-static const struct nu_modinit_s timer1_modinit = {TIMER_1, TMR1_MODULE, CLK_CLKSEL1_TMR1_S_LIRC, 0, TMR1_RST, TMR1_IRQn, (void *) TMR1_IRQHandler};
-#endif
 
 #define TIMER_MODINIT      timer1_modinit
 
@@ -90,14 +82,14 @@ void lp_ticker_init(void)
     }
     ticker_inited = 1;
 
+    // Reset module
+    SYS_ResetModule(TIMER_MODINIT.rsetidx);
+
     // Select IP clock source
     CLK_SetModuleClock(TIMER_MODINIT.clkidx, TIMER_MODINIT.clksrc, TIMER_MODINIT.clkdiv);
 
     // Enable IP clock
     CLK_EnableModuleClock(TIMER_MODINIT.clkidx);
-
-    // Reset module
-    SYS_ResetModule(TIMER_MODINIT.rsetidx);
 
     TIMER_T *timer_base = (TIMER_T *) NU_MODBASE(TIMER_MODINIT.modname);
 

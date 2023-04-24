@@ -29,7 +29,7 @@ sys.path.insert(0, ROOT)
 from tools.config import ConfigException, Config
 from tools.test_configs import get_default_config
 from tools.test_api import find_tests, get_test_config, print_tests, build_tests, test_spec_from_test_builds
-from tools.options import get_default_options_parser, extract_profile, extract_mcus, argparse_profile_filestring_type
+from tools.options import get_default_options_parser, extract_profile, extract_mcus
 from tools.build_api import build_library
 from tools.build_api import print_build_memory_usage
 from tools.build_api import merge_build_data
@@ -43,6 +43,8 @@ from tools.utils import argparse_dir_not_parent
 from tools.utils import print_end_warnings
 from tools.settings import ROOT
 from tools.targets import Target
+from tools.psa import generate_psa_sources, clean_psa_autogen
+from tools.resources import OsAndSpeResourceFilter, SpeOnlyResourceFilter
 
 def main():
     error = False
@@ -108,24 +110,13 @@ def main():
                           default=False,
                           help="Verbose diagnostic output")
 
-        parser.add_argument("--silent",
-                            action="store_true",
-                            dest="silent",
-                            default=False,
-                            help="Silent diagnostic output (no copy, compile notification)")
-
         parser.add_argument("--stats-depth",
                             type=int,
                             dest="stats_depth",
                             default=2,
                             help="Depth level for static memory report")
-
         parser.add_argument("--ignore", dest="ignore", type=argparse_many(str),
                           default=None, help="Comma separated list of patterns to add to mbedignore (eg. ./main.cpp)")
-
-        parser.add_argument("--coverage-filters", dest="coverage_patterns", nargs='+',
-                          default=[], help="match patterns to build with debug compile and coverage linker options")
-        
         parser.add_argument("--icetea",
                             action="store_true",
                             dest="icetea",
@@ -221,6 +212,10 @@ def main():
             print_tests(tests, options.format)
             sys.exit(0)
         else:
+
+            if options.clean:
+                clean_psa_autogen()
+
             # Build all tests
             if not options.build_dir:
                 args_error(parser, "argument --build is required")
@@ -231,13 +226,6 @@ def main():
             if not base_source_paths:
                 base_source_paths = ['.']
 
-            # Coverage requires debug profile
-            if options.coverage_patterns:
-                if toolchain != u'GCC_ARM':
-                    raise ToolException('Coverage supports only GCC_ARM toolchain')
-                options.profile.append(argparse_profile_filestring_type('debug'))
-                print("[Warning] Test building with coverage filters %s" % options.coverage_patterns)
-
             build_report = {}
             build_properties = {}
 
@@ -245,9 +233,17 @@ def main():
             profile = extract_profile(parser, options, internal_tc_name)
             try:
                 resource_filter = None
+                if target.is_PSA_secure_target:
+                    resource_filter = OsAndSpeResourceFilter()
+
+                if target.is_PSA_target:
+                    generate_psa_sources(
+                        source_dirs=base_source_paths,
+                        ignore_paths=[options.build_dir]
+                    )
 
                 # Build sources
-                notify = TerminalNotifier(options.verbose, options.silent)
+                notify = TerminalNotifier(options.verbose)
                 build_library(base_source_paths, options.build_dir, mcu,
                               toolchain_name, jobs=options.jobs,
                               clean=options.clean, report=build_report,
@@ -257,18 +253,15 @@ def main():
                               app_config=config,
                               build_profile=profile,
                               ignore=options.ignore,
-                              coverage_patterns=options.coverage_patterns,
                               resource_filter=resource_filter
                               )
 
                 library_build_success = True
             except ToolException as e:
                 # ToolException output is handled by the build log
-                print("[ERROR] " + str(e))
                 pass
             except NotSupportedException as e:
                 # NotSupportedException is handled by the build log
-                print("[ERROR] " + str(e))
                 pass
             except Exception as e:
                 if options.verbose:
@@ -280,10 +273,13 @@ def main():
             if not library_build_success:
                 print("Failed to build library")
             else:
-                resource_filter = None
+                if target.is_PSA_secure_target:
+                    resource_filter = SpeOnlyResourceFilter()
+                else:
+                    resource_filter = None
 
                 # Build all the tests
-                notify = TerminalNotifier(options.verbose, options.silent)
+                notify = TerminalNotifier(options.verbose)
                 test_build_success, test_build = build_tests(
                     tests,
                     [os.path.relpath(options.build_dir)],
@@ -301,7 +297,6 @@ def main():
                     build_profile=profile,
                     stats_depth=options.stats_depth,
                     ignore=options.ignore,
-                    coverage_patterns=options.coverage_patterns,
                     resource_filter=resource_filter)
 
                 # If a path to a test spec is provided, write it to a file
@@ -315,7 +310,7 @@ def main():
 
             # Print memory map summary on screen
             if build_report:
-                print()
+                print
                 print(print_build_memory_usage(build_report))
 
             print_report_exporter = ReportExporter(ResultExporterType.PRINT, package="build")

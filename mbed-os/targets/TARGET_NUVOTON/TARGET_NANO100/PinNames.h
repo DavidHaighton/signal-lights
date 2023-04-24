@@ -13,9 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-/* MBED TARGET LIST: NUMAKER_PFM_NANO130 */
-
 #ifndef MBED_PINNAMES_H
 #define MBED_PINNAMES_H
 
@@ -114,20 +111,12 @@ typedef enum {
         
     // NOTE: other board-specific naming
     // UART naming
-    CONSOLE_TX = PB_1,
-    CONSOLE_RX = PB_0,
-#if defined(MBED_CONF_TARGET_STDIO_UART_TX)
-    STDIO_UART_TX   = MBED_CONF_TARGET_STDIO_UART_TX,
-#else
-    STDIO_UART_TX   = CONSOLE_TX,
-#endif
-#if defined(MBED_CONF_TARGET_STDIO_UART_RX)
-    STDIO_UART_RX   = MBED_CONF_TARGET_STDIO_UART_RX,
-#else
-    STDIO_UART_RX   = CONSOLE_RX,
-#endif
-    SERIAL_TX = CONSOLE_TX,
-    SERIAL_RX = CONSOLE_RX,    
+    USBTX = PB_1,
+    USBRX = PB_0,
+    STDIO_UART_TX   = USBTX,
+    STDIO_UART_RX   = USBRX,
+    SERIAL_TX = USBTX,
+    SERIAL_RX = USBRX,    
     // LED naming
     LED1 = PE_11,
     LED2 = PE_10,
@@ -141,9 +130,6 @@ typedef enum {
     SW2 = PE_6,
     BUTTON1 = SW1,
     BUTTON2 = SW2,
-
-    // Force PinName to 32-bit required by NU_PINNAME_BIND(...)
-    FORCE_ENUM_PINNAME_32BIT = 0x7FFFFFFF,
 
 } PinName;
 

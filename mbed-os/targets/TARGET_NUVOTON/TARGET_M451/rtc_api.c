@@ -24,27 +24,13 @@
 #include "nu_miscutil.h"
 #include "mbed_mktime.h"
 
-/* Not support LIRC-clocked RTC
- *
- * Though H/W supports this path, it is still not supported because:
- * 1. RTC is trimmed only for 32.768 KHz LXT, not for other clock rates.
- * 2. RTC's clock source will reset to default LXT on reset. This results in rtc_reset test failing.
- */
-#if !MBED_CONF_TARGET_LXT_PRESENT
-#error "RTC can only clock by LXT but LXT is not present. Try disabling RTC by \"device_has_remove\" in mbed_app.json"
-#endif
-
 /* Micro seconds per second */
 #define NU_US_PER_SEC               1000000
 /* Timer clock per second
  *
  * NOTE: This dependents on real hardware.
  */
-#if MBED_CONF_TARGET_LXT_PRESENT
-#define NU_RTCCLK_PER_SEC           __LXT
-#else
-#define NU_RTCCLK_PER_SEC           __LIRC
-#endif
+#define NU_RTCCLK_PER_SEC           ((CLK->CLKSEL3 & CLK_CLKSEL3_SC0SEL_Msk) ? __LIRC : __LXT)
 
 /* Strategy for implementation of RTC HAL
  *
@@ -98,11 +84,7 @@ static time_t t_write = 0;
 /* Convert date time from H/W RTC to struct TM */
 static void rtc_convert_datetime_hwrtc_to_tm(struct tm *datetime_tm, const S_RTC_TIME_DATA_T *datetime_hwrtc);
 
-#if MBED_CONF_TARGET_LXT_PRESENT
-static const struct nu_modinit_s rtc_modinit = {RTC_0, RTC_MODULE, CLK_CLKSEL3_RTCSEL_LXT, 0, 0, RTC_IRQn, NULL};
-#else
-static const struct nu_modinit_s rtc_modinit = {RTC_0, RTC_MODULE, CLK_CLKSEL3_RTCSEL_LIRC, 0, 0, RTC_IRQn, NULL};
-#endif
+static const struct nu_modinit_s rtc_modinit = {RTC_0, RTC_MODULE, 0, 0, 0, RTC_IRQn, NULL};
 
 void rtc_init(void)
 {
@@ -123,10 +105,11 @@ void rtc_free(void)
 
 int rtc_isenabled(void)
 {
-    // To access (RTC) registers, clock must be enabled first.
-    // For TZ, with RTC being secure, we needn't call the secure gateway versions.
-    CLK_EnableModuleClock(rtc_modinit.clkidx);
-    CLK_SetModuleClock(rtc_modinit.clkidx, rtc_modinit.clksrc, rtc_modinit.clkdiv);
+    // NOTE: To access (RTC) registers, clock must be enabled first.
+    if (! (CLK->APBCLK0 & CLK_APBCLK0_RTCCKEN_Msk)) {
+        // Enable IP clock
+        CLK_EnableModuleClock(rtc_modinit.clkidx);
+    }
 
     // NOTE: Check RTC Init Active flag to support crossing reset cycle.
     return  !! (RTC->INIT & RTC_INIT_ACTIVE_Msk);

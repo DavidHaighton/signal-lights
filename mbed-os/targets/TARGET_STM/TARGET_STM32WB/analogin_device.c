@@ -1,18 +1,32 @@
 /* mbed Microcontroller Library
- * Copyright (c) 2019 STMicroelectronics
+ *******************************************************************************
+ * Copyright (c) 2019, STMicroelectronics
  * SPDX-License-Identifier: Apache-2.0
+ * All rights reserved.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ * 3. Neither the name of STMicroelectronics nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *******************************************************************************
  */
 
 #if DEVICE_ANALOGIN
@@ -66,19 +80,12 @@ void analogin_init(analogin_t *obj, PinName pin)
     obj->handle.Init.ContinuousConvMode    = DISABLE;                       // Continuous mode disabled to have only 1 conversion at each conversion trig
     obj->handle.Init.NbrOfConversion       = 1;                             // Parameter discarded because sequencer is disabled
     obj->handle.Init.DiscontinuousConvMode = DISABLE;                       // Parameter discarded because sequencer is disabled
+    obj->handle.Init.NbrOfDiscConversion   = 1;                             // Parameter discarded because sequencer is disabled
     obj->handle.Init.ExternalTrigConv      = ADC_SOFTWARE_START;            // Software start to trig the 1st conversion manually, without external event
     obj->handle.Init.ExternalTrigConvEdge  = ADC_EXTERNALTRIGCONVEDGE_NONE;
     obj->handle.Init.DMAContinuousRequests = DISABLE;
     obj->handle.Init.Overrun               = ADC_OVR_DATA_OVERWRITTEN;      // DR register is overwritten with the last conversion result in case of overrun
-#if defined (ADC_SUPPORT_2_5_MSPS)
-    obj->handle.Init.LowPowerAutoPowerOff  = DISABLE;
-    obj->handle.Init.SamplingTimeCommon1   = ADC_SAMPLETIME_79CYCLES_5;
-    obj->handle.Init.SamplingTimeCommon2   = ADC_SAMPLETIME_160CYCLES_5;
-    obj->handle.Init.TriggerFrequencyMode  = ADC_TRIGGER_FREQ_HIGH;
-#else
-    obj->handle.Init.NbrOfDiscConversion   = 1;                             // Parameter discarded because sequencer is disabled
     obj->handle.Init.OversamplingMode      = DISABLE;                       // No oversampling
-#endif
 
     // Enable ADC core clock
     __HAL_RCC_ADC_CLK_ENABLE();
@@ -103,23 +110,15 @@ uint16_t adc_read(analogin_t *obj)
 
     // Configure ADC channel
     sConfig.Rank         = ADC_REGULAR_RANK_1;
-#if !defined (ADC_SUPPORT_2_5_MSPS)
     sConfig.SamplingTime = ADC_SAMPLETIME_47CYCLES_5;
     sConfig.SingleDiff   = ADC_SINGLE_ENDED;
     sConfig.OffsetNumber = ADC_OFFSET_NONE;
     sConfig.Offset       = 0;
-#else
-    sConfig.SamplingTime = ADC_SAMPLINGTIME_COMMON_1;
-#endif
 
     switch (obj->channel) {
         case 0:
             sConfig.Channel = ADC_CHANNEL_VREFINT;
-#if !defined (ADC_SUPPORT_2_5_MSPS)
             sConfig.SamplingTime = ADC_SAMPLETIME_247CYCLES_5; // Minimum ADC sampling time when reading the internal reference voltage is 4us
-#else
-            sConfig.SamplingTime = ADC_SAMPLINGTIME_COMMON_2;
-#endif
             break;
         case 1:
             sConfig.Channel = ADC_CHANNEL_1;
@@ -171,19 +170,11 @@ uint16_t adc_read(analogin_t *obj)
             break;
         case 17:
             sConfig.Channel = ADC_CHANNEL_TEMPSENSOR;
-#if !defined (ADC_SUPPORT_2_5_MSPS)
             sConfig.SamplingTime = ADC_SAMPLETIME_247CYCLES_5; // Minimum ADC sampling time when reading the temperature is 5us
-#else
-            sConfig.SamplingTime = ADC_SAMPLINGTIME_COMMON_2;
-#endif
             break;
         case 18:
             sConfig.Channel = ADC_CHANNEL_VBAT;
-#if !defined (ADC_SUPPORT_2_5_MSPS)
             sConfig.SamplingTime = ADC_SAMPLETIME_640CYCLES_5; // Minimum ADC sampling time when reading the VBAT is 12us
-#else
-            sConfig.SamplingTime = ADC_SAMPLINGTIME_COMMON_2;
-#endif
             break;
         default:
             return 0;
@@ -203,11 +194,6 @@ uint16_t adc_read(analogin_t *obj)
     if (HAL_ADC_PollForConversion(&obj->handle, 10) == HAL_OK) {
         adcValue = (uint16_t)HAL_ADC_GetValue(&obj->handle);
     }
-
-    if (HAL_ADC_Stop(&obj->handle) != HAL_OK) {
-        debug("HAL_ADC_Stop failed\r\n");
-    }
-
     LL_ADC_SetCommonPathInternalCh(__LL_ADC_COMMON_INSTANCE((&obj->handle)->Instance), LL_ADC_PATH_INTERNAL_NONE);
     return adcValue;
 }

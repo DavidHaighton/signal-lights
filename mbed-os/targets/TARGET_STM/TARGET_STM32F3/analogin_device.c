@@ -37,29 +37,25 @@
 #include "mbed_debug.h"
 #include "PeripheralPins.h"
 
-#if STATIC_PINMAP_READY
-#define ANALOGIN_INIT_DIRECT analogin_init_direct
-void analogin_init_direct(analogin_t *obj, const PinMap *pinmap)
-#else
-#define ANALOGIN_INIT_DIRECT _analogin_init_direct
-static void _analogin_init_direct(analogin_t *obj, const PinMap *pinmap)
-#endif
+void analogin_init(analogin_t *obj, PinName pin)
 {
-    uint32_t function = (uint32_t)pinmap->function;
-
-    // Get the peripheral name from the pin and assign it to the object
-    obj->handle.Instance = (ADC_TypeDef *)pinmap->peripheral;
+    uint32_t function = (uint32_t)NC;
 
     // ADC Internal Channels "pins"  (Temperature, Vref, Vbat, ...)
     //   are described in PinNames.h and PeripheralPins.c
     //   Pin value must be between 0xF0 and 0xFF
-    if ((pinmap->pin < 0xF0) || (pinmap->pin >= 0x100)) {
+    if ((pin < 0xF0) || (pin >= 0x100)) {
         // Normal channels
+        // Get the peripheral name from the pin and assign it to the object
+        obj->handle.Instance = (ADC_TypeDef *)pinmap_peripheral(pin, PinMap_ADC);
+        // Get the functions (adc channel) from the pin and assign it to the object
+        function = pinmap_function(pin, PinMap_ADC);
         // Configure GPIO
-        pin_function(pinmap->pin, pinmap->function);
-        pin_mode(pinmap->pin, PullNone);
+        pinmap_pinout(pin, PinMap_ADC);
     } else {
         // Internal channels
+        obj->handle.Instance = (ADC_TypeDef *)pinmap_peripheral(pin, PinMap_ADC_Internal);
+        function = pinmap_function(pin, PinMap_ADC_Internal);
         // No GPIO configuration for internal channels
     }
     MBED_ASSERT(obj->handle.Instance != (ADC_TypeDef *)NC);
@@ -68,7 +64,7 @@ static void _analogin_init_direct(analogin_t *obj, const PinMap *pinmap)
     obj->channel = STM_PIN_CHANNEL(function);
 
     // Save pin number for the read function
-    obj->pin = pinmap->pin;
+    obj->pin = pin;
 
     // Configure ADC object structures
     obj->handle.State = HAL_ADC_STATE_RESET;
@@ -115,24 +111,6 @@ static void _analogin_init_direct(analogin_t *obj, const PinMap *pinmap)
     if (!HAL_ADCEx_Calibration_GetValue(&obj->handle, ADC_SINGLE_ENDED)) {
         HAL_ADCEx_Calibration_Start(&obj->handle, ADC_SINGLE_ENDED);
     }
-}
-
-void analogin_init(analogin_t *obj, PinName pin)
-{
-    int peripheral;
-    int function;
-
-    if ((pin < 0xF0) || (pin >= 0x100)) {
-        peripheral = (int)pinmap_peripheral(pin, PinMap_ADC);
-        function = (int)pinmap_find_function(pin, PinMap_ADC);
-    } else {
-        peripheral = (int)pinmap_peripheral(pin, PinMap_ADC_Internal);
-        function = (int)pinmap_find_function(pin, PinMap_ADC_Internal);
-    }
-
-    const PinMap static_pinmap = {pin, peripheral, function};
-
-    ANALOGIN_INIT_DIRECT(obj, &static_pinmap);
 }
 
 uint16_t adc_read(analogin_t *obj)

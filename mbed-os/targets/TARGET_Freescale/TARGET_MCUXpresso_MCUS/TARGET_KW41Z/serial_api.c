@@ -1,6 +1,5 @@
 /* mbed Microcontroller Library
  * Copyright (c) 2006-2013 ARM Limited
- * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -283,29 +282,14 @@ const PinMap *serial_rts_pinmap()
     return PinMap_UART_RTS;
 }
 
-bool serial_check_tx_ongoing()
+void serial_wait_tx_complete(uint32_t uart_index)
 {
-    LPUART_Type *base;
-    int i;
-    bool uart_tx_ongoing = false;
-    int clock_enabled = 0;
+    LPUART_Type *base = uart_addrs[uart_index];
 
-    /* First check if UART is enabled */
-    clock_enabled = (SIM->SCGC5 & SIM_SCGC5_LPUART0_MASK) >> SIM_SCGC5_LPUART0_SHIFT;
-
-    if (!clock_enabled) {
-        /* UART is not enabled return */
-        return uart_tx_ongoing;
+    /* Wait till data is flushed out of transmit buffer */
+    while (!(kLPUART_TransmissionCompleteFlag & LPUART_GetStatusFlags((LPUART_Type *)base)))
+    {
     }
-
-    base = uart_addrs[i];
-
-    /* Check if data is waiting to be written out of transmit buffer */
-    if (!(kLPUART_TransmissionCompleteFlag & LPUART_GetStatusFlags((LPUART_Type *)base))) {
-        uart_tx_ongoing = true;
-    }
-
-    return uart_tx_ongoing;
 }
 
 #endif

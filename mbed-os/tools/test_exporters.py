@@ -29,7 +29,7 @@ ResultExporterType = construct_enum(HTML='Html_Exporter',
                                     PRINT='Print_Exporter')
 
 
-class ReportExporter(object):
+class ReportExporter():
     """ Class exports extended test result Python data structure to
         different formats like HTML, JUnit XML.
 

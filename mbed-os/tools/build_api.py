@@ -1,7 +1,6 @@
 """
 mbed SDK
 Copyright (c) 2011-2016 ARM Limited
-SPDX-License-Identifier: Apache-2.0
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -42,14 +41,12 @@ from .paths import (MBED_CMSIS_PATH, MBED_TARGETS_PATH, MBED_LIBRARIES,
                     MBED_CONFIG_FILE, MBED_LIBRARIES_DRIVERS,
                     MBED_LIBRARIES_PLATFORM, MBED_LIBRARIES_HAL,
                     BUILD_DIR)
-from .resources import Resources, FileType, FileRef
+from .resources import Resources, FileType, FileRef, PsaManifestResourceFilter
 from .notifier.mock import MockNotifier
 from .targets import TARGET_NAMES, TARGET_MAP, CORE_ARCH, Target
 from .libraries import Library
 from .toolchains import TOOLCHAIN_CLASSES, TOOLCHAIN_PATHS
 from .toolchains.arm import ARMC5_MIGRATION_WARNING
-from .toolchains.arm import UARM_TOOLCHAIN_WARNING
-from .toolchains.mbed_toolchain import should_replace_small_c_lib
 from .config import Config
 
 RELEASE_VERSIONS = ['2', '5']
@@ -207,7 +204,6 @@ def get_toolchain_name(target, toolchain_name):
 
     return toolchain_name
 
-
 def find_valid_toolchain(target, toolchain):
     """Given a target and toolchain, get the names for the appropriate
     toolchain to use. The environment is also checked to see if the corresponding
@@ -237,29 +233,15 @@ def find_valid_toolchain(target, toolchain):
     last_error = None
     for index, toolchain_name in enumerate(toolchain_names):
         internal_tc_name = get_toolchain_name(target, toolchain_name)
+        if toolchain == "ARM" and toolchain_name == "ARMC5" and index != 0:
+            end_warnings.append(ARMC5_MIGRATION_WARNING)
         if not TOOLCHAIN_CLASSES[internal_tc_name].check_executable():
             search_path = TOOLCHAIN_PATHS[internal_tc_name] or "No path set"
             last_error = (
                 "Could not find executable for {}.\n"
                 "Currently set search path: {}"
             ).format(toolchain_name, search_path)
-        else:            
-            if toolchain_name == "ARMC5":
-                end_warnings.append(ARMC5_MIGRATION_WARNING)
-            if (
-                toolchain_name in ["uARM", "ARMC5", "ARMC6"] 
-                and "uARM" in {toolchain_name, target.default_toolchain}
-            ):
-                end_warnings.append(UARM_TOOLCHAIN_WARNING)
-
-            if should_replace_small_c_lib(target, toolchain):
-                warning = (
-                    "Warning: We noticed that target.c_lib is set to small.\n"
-                    "As the {} target does not support a small C library for the {} toolchain,\n"
-                    "we are using the standard C library instead. "
-                ).format(target.name, toolchain)
-                end_warnings.append(warning)
-
+        else:
             return toolchain_name, internal_tc_name, end_warnings
     else:
         if last_error:
@@ -347,13 +329,12 @@ def is_official_target(target_name, version):
                     ("following toolchains: %s" %
                      ", ".join(sorted(supported_toolchains)))
 
-            elif target.c_lib not in ['std', 'small']:
+            elif not target.default_lib == 'std':
                 result = False
-                reason = (
-                    "'target.c_lib' for the '{}' target must be set to 'std' or"
-                    " 'small'.{}"
-                    "It is currently set to '{}'"
-                ).format(target.name, linesep, target.c_lib)
+                reason = ("Target '%s' must set the " % target.name) + \
+                    ("'default_lib' to 'std' to be included in the ") + \
+                    ("mbed OS 5.0 official release." + linesep) + \
+                    ("Currently it is set to '%s'" % target.default_lib)
 
         else:
             result = False
@@ -399,7 +380,7 @@ def transform_release_toolchains(target, version):
         else:
             return target.supported_toolchains
 
-def get_mbed_official_release(version, profile=None):
+def get_mbed_official_release(version):
     """ Given a release version string, return a tuple that contains a target
     and the supported toolchains for that release.
     Ex. Given '2', return (('LPC1768', ('ARM', 'GCC_ARM')),
@@ -410,14 +391,6 @@ def get_mbed_official_release(version, profile=None):
               RELEASE_VERSIONS
     """
 
-    # we ignore version for Mbed 6 as all targets in targets.json file are being supported
-    # if someone passes 2, we return empty tuple, if 5, we keep the behavior the same as 
-    # release version is deprecated and all targets are being supported that are present
-    # in targets.json file
-
-    if version == '2':
-        return tuple(tuple([]))
-
     mbed_official_release = (
         tuple(
             tuple(
@@ -427,9 +400,17 @@ def get_mbed_official_release(version, profile=None):
                         TARGET_MAP[target], version))
                 ]
             ) for target in TARGET_NAMES \
-                if not profile or profile in TARGET_MAP[target].supported_application_profiles
+            if (hasattr(TARGET_MAP[target], 'release_versions')
+                and version in TARGET_MAP[target].release_versions)
+                and not Target.get_target(target).is_PSA_secure_target
         )
     )
+
+    for target in mbed_official_release:
+        is_official, reason = is_official_target(target[0], version)
+
+        if not is_official:
+            raise InvalidReleaseTargetException(reason)
 
     return mbed_official_release
 
@@ -456,7 +437,7 @@ def target_supports_toolchain(target, toolchain_name):
 def prepare_toolchain(src_paths, build_dir, target, toolchain_name,
                       macros=None, clean=False, jobs=1,
                       notify=None, config=None, app_config=None,
-                      build_profile=None, ignore=None, coverage_patterns=None):
+                      build_profile=None, ignore=None):
     """ Prepares resource related objects - toolchain, target, config
 
     Positional arguments:
@@ -473,7 +454,6 @@ def prepare_toolchain(src_paths, build_dir, target, toolchain_name,
     app_config - location of a chosen mbed_app.json file
     build_profile - a list of mergeable build profiles
     ignore - list of paths to add to mbedignore
-    coverage_patterns - list of patterns for code coverage
     """
 
     # We need to remove all paths which are repeated to avoid
@@ -497,9 +477,6 @@ def prepare_toolchain(src_paths, build_dir, target, toolchain_name,
         target.default_toolchain = "uARM"
     toolchain_name = selected_toolchain_name
 
-    if coverage_patterns:
-        target.extra_labels.append(u'COVERAGE')
-
     try:
         cur_tc = TOOLCHAIN_CLASSES[toolchain_name]
     except KeyError:
@@ -511,7 +488,7 @@ def prepare_toolchain(src_paths, build_dir, target, toolchain_name,
             profile[key].extend(contents[toolchain_name].get(key, []))
 
     toolchain = cur_tc(
-        target, notify, macros, build_dir=build_dir, build_profile=profile, coverage_patterns=coverage_patterns)
+        target, notify, macros, build_dir=build_dir, build_profile=profile)
 
     toolchain.config = config
     toolchain.jobs = jobs
@@ -534,7 +511,7 @@ def build_project(src_paths, build_path, target, toolchain_name,
                   report=None, properties=None, project_id=None,
                   project_description=None, config=None,
                   app_config=None, build_profile=None, stats_depth=None,
-                  ignore=None, resource_filter=None, coverage_patterns=None):
+                  ignore=None, resource_filter=None):
     """ Build a project. A project may be a test or a user program.
 
     Positional arguments:
@@ -579,7 +556,7 @@ def build_project(src_paths, build_path, target, toolchain_name,
     toolchain = prepare_toolchain(
         src_paths, build_path, target, toolchain_name, macros=macros,
         clean=clean, jobs=jobs, notify=notify, config=config,
-        app_config=app_config, build_profile=build_profile, ignore=ignore, coverage_patterns=coverage_patterns)
+        app_config=app_config, build_profile=build_profile, ignore=ignore)
     toolchain.version_check()
 
     # The first path will give the name to the library
@@ -623,7 +600,11 @@ def build_project(src_paths, build_path, target, toolchain_name,
         into_dir, extra_artifacts = toolchain.config.deliver_into()
         if into_dir:
             copy_when_different(res[0], into_dir)
-            if extra_artifacts:
+            if not extra_artifacts:
+                if toolchain.target.is_TrustZone_secure_target:
+                    cmse_lib = join(dirname(res[0]), "cmse_lib.o")
+                    copy_when_different(cmse_lib, into_dir)
+            else:
                 for tc, art in extra_artifacts:
                     if toolchain_name == tc:
                         copy_when_different(join(build_path, art), into_dir)
@@ -681,7 +662,7 @@ def build_library(src_paths, build_path, target, toolchain_name,
                   archive=True, notify=None, macros=None, inc_dirs=None, jobs=1,
                   report=None, properties=None, project_id=None,
                   remove_config_header_file=False, app_config=None,
-                  build_profile=None, ignore=None, resource_filter=None, coverage_patterns=None):
+                  build_profile=None, ignore=None, resource_filter=None):
     """ Build a library
 
     Positional arguments:
@@ -732,7 +713,7 @@ def build_library(src_paths, build_path, target, toolchain_name,
     toolchain = prepare_toolchain(
         src_paths, build_path, target, toolchain_name, macros=macros,
         clean=clean, jobs=jobs, notify=notify, app_config=app_config,
-        build_profile=build_profile, ignore=ignore, coverage_patterns=coverage_patterns)
+        build_profile=build_profile, ignore=ignore)
     toolchain.version_check()
 
     # The first path will give the name to the library
@@ -769,6 +750,7 @@ def build_library(src_paths, build_path, target, toolchain_name,
         res = Resources(notify).scan_with_toolchain(
             src_paths, toolchain, dependencies_paths, inc_dirs=inc_dirs)
         res.filter(resource_filter)
+        res.filter(PsaManifestResourceFilter())
 
         # Copy headers, objects and static libraries - all files needed for
         # static lib
@@ -1086,16 +1068,10 @@ def build_mbed_libs(target, toolchain_name, clean=False, macros=None,
 
         incdirs = cmsis_res.inc_dirs + hal_res.inc_dirs + library_incdirs
 
-        # Exclude USB related source files from Mbed OS 2 build as they contain
-        # references to RTOS API which is also not included.
-        exclude_paths = [join(MBED_DRIVERS, "source", "usb")]
-
         # Build Things
         notify.info("Building library %s (%s, %s)" %
                     ('MBED', target.name, toolchain_name))
-        objects = toolchain.compile_legacy_sources(
-            mbed_resources, incdirs, exclude_paths
-        )
+        objects = toolchain.compile_sources(mbed_resources, incdirs)
         separate_objects = []
 
         for obj in objects:
@@ -1230,6 +1206,10 @@ def mcu_toolchain_matrix(verbose_html=False, platform_filter=None,
 
     unique_supported_toolchains = get_unique_supported_toolchains(
         release_targets)
+    #Add ARMC5 column as well to the matrix to help with showing which targets are in ARMC5
+    #ARMC5 is not a toolchain class but yet we use that as a toolchain id in supported_toolchains in targets.json
+    #capture that info in a separate column
+    unique_supported_toolchains.append('ARMC5')
 
     prepend_columns = ["Target"] + ["mbed OS %s" % x for x in RELEASE_VERSIONS]
 

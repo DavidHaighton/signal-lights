@@ -1,6 +1,5 @@
 /* mbed Microcontroller Library
  * Copyright (c) 2006-2015 ARM Limited
- * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,7 +30,7 @@
  ******************************************************************************/
 
 static const PinMap PinMap_UART_TX[] = {
-    {CONSOLE_TX     , UART_0, 0},
+    {USBTX     , UART_0, 0},
     {XB_TX   , UART_1, 0},
     {SH0_TX  , UART_2, 0},
     {SH1_TX  , UART_3, 0},
@@ -39,7 +38,7 @@ static const PinMap PinMap_UART_TX[] = {
 };
 
 static const PinMap PinMap_UART_RX[] = {
-    {CONSOLE_RX     , UART_0, 0},
+    {USBRX     , UART_0, 0},
     {XB_RX   , UART_1, 0},
     {SH0_RX  , UART_2, 0},
     {SH1_RX  , UART_3, 0},

@@ -1,16 +1,31 @@
 /* mbed Microcontroller Library
- * SPDX-License-Identifier: BSD-3-Clause
- ******************************************************************************
- *
- * Copyright (c) 2016-2020 STMicroelectronics.
+ *******************************************************************************
+ * Copyright (c) 2017, STMicroelectronics
  * All rights reserved.
  *
- * This software component is licensed by ST under BSD 3-Clause license,
- * the "License"; You may not use this file except in compliance with the
- * License. You may obtain a copy of the License at:
- *                        opensource.org/licenses/BSD-3-Clause
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
  *
- ******************************************************************************
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ * 3. Neither the name of STMicroelectronics nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *******************************************************************************
  */
 
 #if DEVICE_SERIAL
@@ -207,9 +222,8 @@ void serial_clear(serial_t *obj)
     struct serial_s *obj_s = SERIAL_S(obj);
     UART_HandleTypeDef *huart = &uart_handlers[obj_s->index];
 
-    /* Clear RXNE and error flags */
-    volatile uint32_t tmpval __attribute__((unused)) = huart->Instance->DR;
-    HAL_UART_ErrorCallback(huart);
+    huart->TxXferCount = 0;
+    huart->RxXferCount = 0;
 }
 
 void serial_break_set(serial_t *obj)
@@ -465,6 +479,13 @@ uint8_t serial_rx_active(serial_t *obj)
     return (((HAL_UART_GetState(huart) & HAL_UART_STATE_BUSY_RX) == HAL_UART_STATE_BUSY_RX) ? 1 : 0);
 }
 
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+    if (__HAL_UART_GET_FLAG(huart, UART_FLAG_TC) != RESET) {
+        __HAL_UART_CLEAR_FLAG(huart, UART_FLAG_TC);
+    }
+}
+
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
     if (__HAL_UART_GET_FLAG(huart, UART_FLAG_PE) != RESET) {
@@ -570,13 +591,16 @@ void serial_tx_abort_asynch(serial_t *obj)
     __HAL_UART_DISABLE_IT(huart, UART_IT_TC);
     __HAL_UART_DISABLE_IT(huart, UART_IT_TXE);
 
+    // clear flags
+    __HAL_UART_CLEAR_FLAG(huart, UART_FLAG_TC);
+
     // reset states
     huart->TxXferCount = 0;
     // update handle state
-    if (huart->gState == HAL_UART_STATE_BUSY_TX_RX) {
-        huart->gState = HAL_UART_STATE_BUSY_RX;
+    if (huart->State == HAL_UART_STATE_BUSY_TX_RX) {
+        huart->State = HAL_UART_STATE_BUSY_RX;
     } else {
-        huart->gState = HAL_UART_STATE_READY;
+        huart->State = HAL_UART_STATE_READY;
     }
 }
 
@@ -603,10 +627,10 @@ void serial_rx_abort_asynch(serial_t *obj)
     // reset states
     huart->RxXferCount = 0;
     // update handle state
-    if (huart->RxState == HAL_UART_STATE_BUSY_TX_RX) {
-        huart->RxState = HAL_UART_STATE_BUSY_TX;
+    if (huart->State == HAL_UART_STATE_BUSY_TX_RX) {
+        huart->State = HAL_UART_STATE_BUSY_TX;
     } else {
-        huart->RxState = HAL_UART_STATE_READY;
+        huart->State = HAL_UART_STATE_READY;
     }
 }
 

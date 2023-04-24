@@ -1,6 +1,5 @@
 /* mbed Microcontroller Library
  * Copyright (c) 2006-2013 ARM Limited
- * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,9 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-/* MBED TARGET LIST: GR_LYCHEE */
-
 #ifndef MBED_PINNAMES_H
 #define MBED_PINNAMES_H
 
@@ -57,8 +53,8 @@ typedef enum {
     LED_ORANGE = LED3,
     LED_RED    = LED4,
 
-    CONSOLE_TX = P3_15,
-    CONSOLE_RX = P0_2,
+    USBTX = P3_15,
+    USBRX = P0_2,
 
     // Arduiono Pin Names
     D0 = P5_14,

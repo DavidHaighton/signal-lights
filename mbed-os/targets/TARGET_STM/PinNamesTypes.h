@@ -36,19 +36,16 @@
 extern "C" {
 #endif
 
-#define GPIO_AF_NONE 0
-
 /*  STM PIN data as used in pin_function is coded on 32 bits as below
  *   [2:0]  Function (like in MODER reg) : Input / Output / Alt / Analog
  *     [3]  Output Push-Pull / Open Drain (as in OTYPER reg)
  *   [5:4]  as in PUPDR reg: No Pull, Pull-up, Pull-Donc
- *   [9:6]  speed config (as in OSPEEDR)
- * [13:10]  Alternate Num (as in AFRL/AFRG reg)
- * [17:14]  Channel (Analog/Timer specific)
- *    [19]  Inverted (Analog/Timer specific)
- *    [20]  Analog ADC control - Only valid for specific families
- *    [21]  Analog ADC Channel Bank B - Only valid for specific families
- * [32:22]  Reserved
+ *   [7:6]  Reserved for speed config (as in OSPEEDR), but not used yet
+ *  [11:8]  Alternate Num (as in AFRL/AFRG reg)
+ * [16:12]  Channel (Analog/Timer specific)
+ *    [17]  Inverted (Analog/Timer specific)
+ *    [18]  Analog ADC control - Only valid for specific families
+ * [32:19]  Reserved
  */
 
 #define STM_PIN_FUNCTION_MASK 0x07
@@ -63,29 +60,25 @@ extern "C" {
 #define STM_PIN_PUPD_SHIFT 4
 #define STM_PIN_PUPD_BITS (STM_PIN_PUPD_MASK << STM_PIN_PUPD_SHIFT)
 
-#define STM_PIN_SPEED_MASK 0x0F
+#define STM_PIN_SPEED_MASK 0x03
 #define STM_PIN_SPEED_SHIFT 6
 #define STM_PIN_SPEED_BITS (STM_PIN_SPEED_MASK << STM_PIN_SPEED_SHIFT)
 
 #define STM_PIN_AFNUM_MASK 0x0F
-#define STM_PIN_AFNUM_SHIFT 10
+#define STM_PIN_AFNUM_SHIFT 8
 #define STM_PIN_AFNUM_BITS (STM_PIN_AFNUM_MASK << STM_PIN_AFNUM_SHIFT)
 
 #define STM_PIN_CHAN_MASK 0x1F
-#define STM_PIN_CHAN_SHIFT 14
+#define STM_PIN_CHAN_SHIFT 12
 #define STM_PIN_CHANNEL_BIT (STM_PIN_CHAN_MASK << STM_PIN_CHAN_SHIFT)
 
 #define STM_PIN_INV_MASK 0x01
-#define STM_PIN_INV_SHIFT 19
+#define STM_PIN_INV_SHIFT 17
 #define STM_PIN_INV_BIT (STM_PIN_INV_MASK << STM_PIN_INV_SHIFT)
 
 #define STM_PIN_AN_CTRL_MASK 0x01
-#define STM_PIN_AN_CTRL_SHIFT 20
+#define STM_PIN_AN_CTRL_SHIFT 18
 #define STM_PIN_ANALOG_CONTROL_BIT (STM_PIN_AN_CTRL_MASK << STM_PIN_AN_CTRL_SHIFT)
-
-#define STM_PIN_AN_CHAN_BANK_B_MASK 0x01
-#define STM_PIN_AN_CHAN_BANK_B_SHIFT 21
-#define STM_PIN_ANALOG_CHAN_BANK_B_BIT (STM_PIN_AN_CHAN_BANK_B_MASK << STM_PIN_AN_CHAN_BANK_B_SHIFT)
 
 #define STM_PIN_FUNCTION(X)         (((X) >> STM_PIN_FUNCTION_SHIFT) & STM_PIN_FUNCTION_MASK)
 #define STM_PIN_OD(X)               (((X) >> STM_PIN_OD_SHIFT) & STM_PIN_OD_MASK)
@@ -95,33 +88,17 @@ extern "C" {
 #define STM_PIN_CHANNEL(X)          (((X) >> STM_PIN_CHAN_SHIFT) & STM_PIN_CHAN_MASK)
 #define STM_PIN_INVERTED(X)         (((X) >> STM_PIN_INV_SHIFT) & STM_PIN_INV_MASK)
 #define STM_PIN_ANALOG_CONTROL(X)   (((X) >> STM_PIN_AN_CTRL_SHIFT) & STM_PIN_AN_CTRL_MASK)
-#define STM_PIN_ANALOG_CHANNEL_BANK_B(X)  (((X) >> STM_PIN_AN_CHAN_BANK_B_SHIFT) & STM_PIN_AN_CHAN_BANK_B_MASK)
 
 #define STM_PIN_DEFINE(FUNC_OD, PUPD, AFNUM)  ((int)(FUNC_OD) |\
-            ((STM_PIN_SPEED_MASK & STM_PIN_SPEED_MASK) << STM_PIN_SPEED_SHIFT) |\
-            (((PUPD) & STM_PIN_PUPD_MASK) << STM_PIN_PUPD_SHIFT) |\
-            (((AFNUM) & STM_PIN_AFNUM_MASK) << STM_PIN_AFNUM_SHIFT))
-
-#define STM_PIN_DEFINE_SPEED(FUNC_OD, PUPD, AFNUM, SPEEDV)  ((int)(FUNC_OD) |\
-            (((SPEEDV) & STM_PIN_SPEED_MASK) << STM_PIN_SPEED_SHIFT) |\
-            (((PUPD) & STM_PIN_PUPD_MASK) << STM_PIN_PUPD_SHIFT) |\
-            (((AFNUM) & STM_PIN_AFNUM_MASK) << STM_PIN_AFNUM_SHIFT))
+                          ((PUPD  & STM_PIN_PUPD_MASK) << STM_PIN_PUPD_SHIFT) |\
+                          ((AFNUM & STM_PIN_AFNUM_MASK) << STM_PIN_AFNUM_SHIFT))
 
 #define STM_PIN_DEFINE_EXT(FUNC_OD, PUPD, AFNUM, CHAN, INV) \
-            ((int)(FUNC_OD) |\
-            ((STM_PIN_SPEED_MASK & STM_PIN_SPEED_MASK) << STM_PIN_SPEED_SHIFT) |\
-            (((PUPD) & STM_PIN_PUPD_MASK) << STM_PIN_PUPD_SHIFT) |\
-            (((AFNUM) & STM_PIN_AFNUM_MASK) << STM_PIN_AFNUM_SHIFT) |\
-            (((CHAN) & STM_PIN_CHAN_MASK) << STM_PIN_CHAN_SHIFT) |\
-            (((INV) & STM_PIN_INV_MASK) << STM_PIN_INV_SHIFT))
-
-#define STM_PIN_DEFINE_SPEED_EXT(FUNC_OD, PUPD, AFNUM, CHAN, INV, SPEEDV) \
-            ((int)(FUNC_OD) |\
-            (((SPEEDV) & STM_PIN_SPEED_MASK) << STM_PIN_SPEED_SHIFT) |\
-            (((PUPD) & STM_PIN_PUPD_MASK) << STM_PIN_PUPD_SHIFT) |\
-            (((AFNUM) & STM_PIN_AFNUM_MASK) << STM_PIN_AFNUM_SHIFT) |\
-            (((CHAN) & STM_PIN_CHAN_MASK) << STM_PIN_CHAN_SHIFT) |\
-            (((INV) & STM_PIN_INV_MASK) << STM_PIN_INV_SHIFT))
+                                            ((int)(FUNC_OD) |\
+                       ((PUPD   & STM_PIN_PUPD_MASK) << STM_PIN_PUPD_SHIFT) |\
+                       ((AFNUM  & STM_PIN_AFNUM_MASK) << STM_PIN_AFNUM_SHIFT) |\
+                       ((CHAN   & STM_PIN_CHAN_MASK) << STM_PIN_CHAN_SHIFT) |\
+                       ((INV    & STM_PIN_INV_MASK) << STM_PIN_INV_SHIFT))
 
 /*
  * MACROS to support the legacy definition of PIN formats
@@ -147,7 +124,6 @@ typedef enum {
 #define STM_MODE_AF_OD               (STM_PIN_ALTERNATE | STM_PIN_OD_BITS)
 #define STM_MODE_ANALOG              (STM_PIN_ANALOG)
 #define STM_MODE_ANALOG_ADC_CONTROL  (STM_PIN_ANALOG | STM_PIN_ANALOG_CONTROL_BIT)
-#define STM_MODE_ANALOG_ADC_CHANNEL_BANK_B  (STM_PIN_ANALOG | STM_PIN_ANALOG_CHAN_BANK_B_BIT)
 
 // High nibble = port number (0=A, 1=B, 2=C, 3=D, 4=E, 5=F, 6=G, 7=H)
 // Low nibble  = pin number
@@ -179,3 +155,4 @@ typedef enum {
 #endif
 
 #endif
+

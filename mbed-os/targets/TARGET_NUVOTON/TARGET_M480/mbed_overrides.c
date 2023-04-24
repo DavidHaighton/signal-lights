@@ -1,7 +1,5 @@
-/*
- * Copyright (c) 2015-2016, Nuvoton Technology Corporation
- *
- * SPDX-License-Identifier: Apache-2.0
+/* mbed Microcontroller Library
+ * Copyright (c) 2015-2016 Nuvoton
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,35 +33,21 @@ void mbed_sdk_init(void)
 
     /* Enable HIRC clock (Internal RC 22.1184MHz) */
     CLK_EnableXtalRC(CLK_PWRCTL_HIRCEN_Msk);
-#if MBED_CONF_TARGET_HXT_PRESENT
     /* Enable HXT clock (external XTAL 12MHz) */
     CLK_EnableXtalRC(CLK_PWRCTL_HXTEN_Msk);
-#else
-    /* Disable HXT clock (external XTAL 12MHz) */
-    CLK_DisableXtalRC(CLK_PWRCTL_HXTEN_Msk);
-#endif
-    /* Enable LIRC */
+    /* Enable LIRC for lp_ticker */
     CLK_EnableXtalRC(CLK_PWRCTL_LIRCEN_Msk);
-#if MBED_CONF_TARGET_LXT_PRESENT
-    /* Enable LXT */
+    /* Enable LXT for RTC */
     CLK_EnableXtalRC(CLK_PWRCTL_LXTEN_Msk);
-#else
-    /* Disable LXT */
-    CLK_DisableXtalRC(CLK_PWRCTL_LXTEN_Msk);
-#endif
 
     /* Wait for HIRC clock ready */
     CLK_WaitClockReady(CLK_STATUS_HIRCSTB_Msk);
-#if MBED_CONF_TARGET_HXT_PRESENT
     /* Wait for HXT clock ready */
     CLK_WaitClockReady(CLK_STATUS_HXTSTB_Msk);
-#endif
     /* Wait for LIRC clock ready */
     CLK_WaitClockReady(CLK_STATUS_LIRCSTB_Msk);
-#if MBED_CONF_TARGET_LXT_PRESENT
     /* Wait for LXT clock ready */
     CLK_WaitClockReady(CLK_STATUS_LXTSTB_Msk);
-#endif
 
     /* Select HCLK clock source as HIRC and HCLK clock divider as 1 */
     CLK_SetHCLK(CLK_CLKSEL0_HCLKSEL_HIRC, CLK_CLKDIV0_HCLK(1));
@@ -73,7 +57,7 @@ void mbed_sdk_init(void)
     
     /* Set PCLK0/PCLK1 to HCLK/2 */
     CLK->PCLKDIV = (CLK_PCLKDIV_PCLK0DIV2 | CLK_PCLKDIV_PCLK1DIV2); // PCLK divider set 2
-
+    
 #if DEVICE_ANALOGIN
     /* Vref connect to internal */
     SYS->VREFCTL = (SYS->VREFCTL & ~SYS_VREFCTL_VREFCTL_Msk) | SYS_VREFCTL_VREF_3_0V;
@@ -85,23 +69,4 @@ void mbed_sdk_init(void)
 
     /* Lock protected registers */
     SYS_LockReg();
-
-    /* Get around h/w limit with WDT reset from PD */
-    if (SYS_IS_WDT_RST()) {
-        /* Re-unlock protected clock setting */
-        SYS_UnlockReg();
-
-        /* Set up DPD power down mode */
-        CLK->PMUSTS |= CLK_PMUSTS_CLRWK_Msk;
-        CLK->PMUSTS |= CLK_PMUSTS_TMRWK_Msk;
-        CLK_SetPowerDownMode(CLK_PMUCTL_PDMSEL_DPD);
-
-        CLK_SET_WKTMR_INTERVAL(CLK_PMUCTL_WKTMRIS_256);
-        CLK_ENABLE_WKTMR();
-
-        CLK_PowerDown();
-
-        /* Lock protected registers */
-        SYS_LockReg();
-    }
 }

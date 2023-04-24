@@ -23,8 +23,7 @@
 #include "mbed_assert.h"
 #include "PinNamesTypes.h"
 #include "PinNames.h"
-#include "PortNames.h"
-#include "cyhal_gpio.h"
+#include "cyhal_gpio_impl.h"
 #include "cyhal_pin_package.h"
 
 #ifdef __cplusplus
@@ -33,9 +32,6 @@ extern "C" {
 
 typedef struct {
     cyhal_gpio_t pin;
-    cyhal_gpio_direction_t direction;
-    cyhal_gpio_drive_mode_t drive_mode;
-    int output_val;
 } gpio_t;
 
 struct gpio_irq_s {
@@ -46,10 +42,8 @@ struct gpio_irq_s {
 };
 
 struct port_s {
-    PortName port;
+    GPIO_PRT_Type *port;
     uint8_t mask;
-    cyhal_gpio_direction_t direction;
-    cyhal_gpio_drive_mode_t drive_mode;
 };
 
 /** Set the output value
@@ -58,21 +52,6 @@ struct port_s {
  * @param value The value to be set
  */
 static inline void gpio_write(gpio_t *obj, int value)
-{
-    if (obj->direction != CYHAL_GPIO_DIR_INPUT) {
-        MBED_ASSERT(obj->pin != CYHAL_NC_PIN_VALUE);
-        cyhal_gpio_write(obj->pin, value != 0);
-    } else {
-        obj->output_val = value;
-    }
-}
-
-/** Set the pull value
- *
- * @param obj   The GPIO object
- * @param value The pull value to be set
- */
-static inline void gpio_set_pull(gpio_t *obj, int value)
 {
     MBED_ASSERT(obj->pin != CYHAL_NC_PIN_VALUE);
     cyhal_gpio_write(obj->pin, value != 0);

@@ -1,6 +1,5 @@
 /* mbed Microcontroller Library
  * Copyright (c) 2013 ARM Limited
- * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -62,6 +61,7 @@ void spi_free(spi_t *obj)
 
 void spi_format(spi_t *obj, int bits, int mode, int slave)
 {
+
     dspi_master_config_t master_config;
     dspi_slave_config_t slave_config;
 
@@ -81,7 +81,7 @@ void spi_format(spi_t *obj, int bits, int mode, int slave)
         master_config.ctarConfig.cpol = (mode & 0x2) ? kDSPI_ClockPolarityActiveLow : kDSPI_ClockPolarityActiveHigh;
         master_config.ctarConfig.cpha = (mode & 0x1) ? kDSPI_ClockPhaseSecondEdge : kDSPI_ClockPhaseFirstEdge;
         master_config.ctarConfig.direction = kDSPI_MsbFirst;
-        master_config.ctarConfig.pcsToSckDelayInNanoSec = 100;
+        master_config.ctarConfig.pcsToSckDelayInNanoSec = 0;
 
         DSPI_MasterInit(spi_address[obj->instance], &master_config, CLOCK_GetFreq(spi_clocks[obj->instance]));
     }
@@ -95,7 +95,7 @@ void spi_frequency(spi_t *obj, int hz)
     DSPI_MasterSetDelayTimes(spi_address[obj->instance], kDSPI_Ctar0, kDSPI_LastSckToPcs, busClock, 500000000 / hz);
 }
 
-static inline int spi_readable(spi_t *obj)
+static inline int spi_readable(spi_t * obj)
 {
     return (DSPI_GetStatusFlags(spi_address[obj->instance]) & kDSPI_RxFifoDrainRequestFlag);
 }

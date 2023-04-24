@@ -1,6 +1,5 @@
 /* mbed Microcontroller Library
  * Copyright (c) 2006-2013 ARM Limited
- * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -112,13 +111,13 @@ static void gpio_irq7(void) {
     handle_interrupt_in(7);
 }
 
-int gpio_irq_init(gpio_irq_t *obj, PinName pin, gpio_irq_handler handler, uintptr_t context) {
+int gpio_irq_init(gpio_irq_t *obj, PinName pin, gpio_irq_handler handler, uint32_t id) {
     int shift;
     if (pin == NC) return -1;
 
     obj->ch = pinmap_peripheral(pin, PinMap_IRQ);
     obj->pin = (int)pin ;
-    obj->port = (int)context ;
+    obj->port = (int)id ;
 
     shift = obj->ch*2;
     channel_obj[obj->ch] = obj;

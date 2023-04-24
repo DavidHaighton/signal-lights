@@ -35,85 +35,6 @@
 
 extern GPIO_TypeDef *Set_GPIO_Clock(uint32_t port_idx);
 
-#if defined(DUAL_PAD) // STM32H7
-
-typedef struct {
-  PinName pin;
-  uint32_t LL_AnalogSwitch;
-} PinAnalogSwitch;
-
-
-const PinAnalogSwitch PinMapAnalogSwitch[] = {
-  {PA_0,     LL_SYSCFG_ANALOG_SWITCH_PA0},
-  {PA_1,     LL_SYSCFG_ANALOG_SWITCH_PA1},
-  {PC_2,     LL_SYSCFG_ANALOG_SWITCH_PC2},
-  {PC_3,     LL_SYSCFG_ANALOG_SWITCH_PC3},
-  {NC,   0}
-};
-
-/**
- * Configure Analog dualpad switch if necessary
- * LL_AnalogSwitch: LL define to be used to configure Analog switch
- */
-static void configure_dualpad_switch(PinName pin, int function, uint32_t LL_AnalogSwitch)
-{
-  if (LL_AnalogSwitch == 0) {
-    return ;
-  }
-
-  if (((function & STM_MODE_ANALOG) != STM_MODE_ANALOG)
-      && ((pin & DUAL_PAD) == DUAL_PAD)) {
-    /**
-      * We don't configure an analog function but the pin is an analog pad
-      * Pxy_C. In this cases Analog switch should be closed
-      */
-    LL_SYSCFG_CloseAnalogSwitch(LL_AnalogSwitch);
-    return ;
-  } else {
-    /**
-      * Either we configure an analog function,
-      * or it is not an analog function but it is not an analog pad Pxy_C.
-      * In both cases Analog switch should be opened
-      * Note: direct ADC is restricted to Pxy_C,  pin only
-      */
-    LL_SYSCFG_OpenAnalogSwitch(LL_AnalogSwitch);
-    return ;
-  }
-}
-
-/**
- * In case of dual pad, determine whether gpio needs to be configured
- * pLL_AnalogSwitch: pointer used to retrun LL define to be used to configure
- * Analog switch
- * return: true when gpio must be configured
- */
-static bool is_dualpad_switch_gpio_configurable(PinName pin, int function, uint32_t *pLL_AnalogSwitch)
-{
-  PinAnalogSwitch *AnalogSwitch = (PinAnalogSwitch *) PinMapAnalogSwitch;
-
-  /* Read through PinMapAnalogSwitch array */
-  while (AnalogSwitch->pin != NC) {
-    /* Check whether pin is or is associated to dualpad Analog Input */
-    if ((AnalogSwitch->pin | DUAL_PAD)  == (pin | DUAL_PAD)) {
-      *pLL_AnalogSwitch = AnalogSwitch->LL_AnalogSwitch;
-      if (((function & STM_MODE_ANALOG) == STM_MODE_ANALOG)
-          && ((pin & DUAL_PAD) == DUAL_PAD)) {
-        /**
-         * We configure an analog function and the pin is an analog pad Pxy_C
-         * In this case gpio configuration must be skipped
-         */
-        return false;
-      } else {
-        return true;
-      }
-    }
-    AnalogSwitch ++;
-  }
-  *pLL_AnalogSwitch = 0;
-  return true;
-}
-#endif /* DUAL_PAD */
-
 const uint32_t ll_pin_defines[16] = {
     LL_GPIO_PIN_0,
     LL_GPIO_PIN_1,
@@ -138,29 +59,17 @@ const uint32_t ll_pin_defines[16] = {
  */
 void pin_function(PinName pin, int data)
 {
-    if (pin == NC) {
-        return;
-    }
+    MBED_ASSERT(pin != (PinName)NC);
 
     // Get the pin informations
     uint32_t mode  = STM_PIN_FUNCTION(data);
     uint32_t afnum = STM_PIN_AFNUM(data);
-    uint32_t speed = STM_PIN_SPEED(data);
     uint32_t port = STM_PORT(pin);
     uint32_t ll_pin  = ll_pin_defines[STM_PIN(pin)];
     uint32_t ll_mode = 0;
 
-#if defined(DUAL_PAD)
-  uint32_t LL_AnalogSwitch = 0;
-  if (!is_dualpad_switch_gpio_configurable(pin, data, &LL_AnalogSwitch)) {
-    /* Skip gpio configuration */
-    configure_dualpad_switch(pin, data, LL_AnalogSwitch);
-    return;
-  }
-#endif /* DUAL_PAD */
-
     // Enable GPIO clock
-    GPIO_TypeDef *const gpio = Set_GPIO_Clock(port);
+    GPIO_TypeDef *gpio = Set_GPIO_Clock(port);
 
     /*  Set default speed to high.
      *  For most families there are dedicated registers so it is
@@ -170,26 +79,13 @@ void pin_function(PinName pin, int data)
 #if defined (TARGET_STM32F1)
     if (mode == STM_PIN_OUTPUT) {
 #endif
-#if defined(DUAL_CORE) && (TARGET_STM32H7)
-        while (LL_HSEM_1StepLock(HSEM, CFG_HW_GPIO_SEMID)) {
-        }
-#endif /* DUAL_CORE */
-        switch (speed) {
-            /* Default value for backward compatibility */
-            case STM_PIN_SPEED_MASK:
+
 #if defined (LL_GPIO_SPEED_FREQ_VERY_HIGH)
-                LL_GPIO_SetPinSpeed(gpio, ll_pin, LL_GPIO_SPEED_FREQ_VERY_HIGH);
+        LL_GPIO_SetPinSpeed(gpio, ll_pin, LL_GPIO_SPEED_FREQ_VERY_HIGH);
 #else
-                LL_GPIO_SetPinSpeed(gpio, ll_pin, LL_GPIO_SPEED_FREQ_HIGH);
+        LL_GPIO_SetPinSpeed(gpio, ll_pin, LL_GPIO_SPEED_FREQ_HIGH);
 #endif
-                break;
-            default:
-                LL_GPIO_SetPinSpeed(gpio, ll_pin, speed);
-                break;
-        }
-#if defined(DUAL_CORE) && (TARGET_STM32H7)
-        LL_HSEM_ReleaseLock(HSEM, CFG_HW_GPIO_SEMID, HSEM_CR_COREID_CURRENT);
-#endif /* DUAL_CORE */
+
 #if defined (TARGET_STM32F1)
     }
 #endif
@@ -213,12 +109,6 @@ void pin_function(PinName pin, int data)
             MBED_ASSERT(0);
             break;
     }
-
-#if defined(DUAL_CORE) && (TARGET_STM32H7)
-    while (LL_HSEM_1StepLock(HSEM, CFG_HW_GPIO_SEMID)) {
-    }
-#endif /* DUAL_CORE */
-
     LL_GPIO_SetPinMode(gpio, ll_pin, ll_mode);
 
 #if defined(GPIO_ASCR_ASC0)
@@ -241,15 +131,7 @@ void pin_function(PinName pin, int data)
 
     stm_pin_PullConfig(gpio, ll_pin, STM_PIN_PUPD(data));
 
-#if defined(DUAL_PAD)
-    configure_dualpad_switch(pin, data, LL_AnalogSwitch);
-#endif /* DUAL_PAD */
-
     stm_pin_DisconnectDebug(pin);
-
-#if defined(DUAL_CORE) && (TARGET_STM32H7)
-    LL_HSEM_ReleaseLock(HSEM, CFG_HW_GPIO_SEMID, HSEM_CR_COREID_CURRENT);
-#endif /* DUAL_CORE */
 }
 
 /**
@@ -257,20 +139,12 @@ void pin_function(PinName pin, int data)
  */
 void pin_mode(PinName pin, PinMode mode)
 {
-    if (pin == NC) {
-        return;
-    }
+    MBED_ASSERT(pin != (PinName)NC);
 
     uint32_t port_index = STM_PORT(pin);
     uint32_t ll_pin  = ll_pin_defines[STM_PIN(pin)];
     // Enable GPIO clock
     GPIO_TypeDef *gpio = Set_GPIO_Clock(port_index);
-
-#if defined(DUAL_CORE) && (TARGET_STM32H7)
-    while (LL_HSEM_1StepLock(HSEM, CFG_HW_GPIO_SEMID)) {
-    }
-#endif /* DUAL_CORE */
-
     uint32_t function = LL_GPIO_GetPinMode(gpio, ll_pin);
 
     if ((function == LL_GPIO_MODE_OUTPUT) || (function == LL_GPIO_MODE_ALTERNATE)) {
@@ -288,8 +162,4 @@ void pin_mode(PinName pin, PinMode mode)
     } else {
         stm_pin_PullConfig(gpio, ll_pin, GPIO_NOPULL);
     }
-
-#if defined(DUAL_CORE) && (TARGET_STM32H7)
-    LL_HSEM_ReleaseLock(HSEM, CFG_HW_GPIO_SEMID, HSEM_CR_COREID_CURRENT);
-#endif /* DUAL_CORE */
 }

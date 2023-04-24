@@ -20,7 +20,19 @@
 #include "platform/mbed_stats.h"
 #include <stdint.h>
 
-#if defined(MBED_STACK_STATS_ENABLED) && MBED_STACK_STATS_ENABLED && defined(MBED_CONF_RTOS_PRESENT)
+#define THREAD_BUF_COUNT    16
+
+typedef struct {
+    uint32_t entry;
+    uint32_t stack_size;
+    uint32_t max_stack;
+} thread_info_t;
+
+#if defined(MBED_STACK_STATS_ENABLED) && MBED_STACK_STATS_ENABLED
+
+#if !defined(MBED_CONF_RTOS_PRESENT) || !(MBED_CONF_RTOS_PRESENT)
+#error "RTOS required for Stack stats"
+#endif
 
 #include "rtos/Mutex.h"
 #include "rtos/Thread.h"
@@ -31,15 +43,6 @@
 #include "platform/CircularBuffer.h"
 using namespace mbed;
 using namespace rtos;
-
-#define THREAD_BUF_COUNT    16
-
-typedef struct {
-    uint32_t entry;
-    uint32_t stack_size;
-    uint32_t max_stack;
-    const char *stack_name;
-} thread_info_t;
 
 // Mutex to protect "buf"
 static SingletonPtr<Mutex> mutex;
@@ -54,21 +57,20 @@ static void send_CPU_info(void);
 #if defined(MBED_HEAP_STATS_ENABLED ) && MBED_HEAP_STATS_ENABLED
 static void send_heap_info(void);
 #endif
-#if defined(MBED_STACK_STATS_ENABLED) && MBED_STACK_STATS_ENABLED && defined(MBED_CONF_RTOS_PRESENT)
+#if defined(MBED_STACK_STATS_ENABLED) && MBED_STACK_STATS_ENABLED
 static void send_stack_info(void);
 static void on_thread_terminate(osThreadId_t id);
 static void enqeue_thread_info(osThreadId_t id);
 static void deque_and_print_thread_info(void);
 
 // sprintf uses a lot of stack so use these instead
-static uint32_t print_str(char *buf, const char *value);
 static uint32_t print_hex(char *buf, uint32_t value);
 static uint32_t print_dec(char *buf, uint32_t value);
 #endif
 
 void greentea_metrics_setup()
 {
-#if defined(MBED_STACK_STATS_ENABLED) && MBED_STACK_STATS_ENABLED && defined(MBED_CONF_RTOS_PRESENT)
+#if defined(MBED_STACK_STATS_ENABLED) && MBED_STACK_STATS_ENABLED
     Kernel::attach_thread_terminate_hook(on_thread_terminate);
 #endif
 }
@@ -78,7 +80,7 @@ void greentea_metrics_report()
 #if defined(MBED_HEAP_STATS_ENABLED ) && MBED_HEAP_STATS_ENABLED
     send_heap_info();
 #endif
-#if defined(MBED_STACK_STATS_ENABLED) && MBED_STACK_STATS_ENABLED && defined(MBED_CONF_RTOS_PRESENT)
+#if defined(MBED_STACK_STATS_ENABLED) && MBED_STACK_STATS_ENABLED
     send_stack_info();
     Kernel::attach_thread_terminate_hook(NULL);
 #endif
@@ -110,7 +112,7 @@ static void send_heap_info()
 }
 #endif
 
-#if defined(MBED_STACK_STATS_ENABLED) && MBED_STACK_STATS_ENABLED && defined(MBED_CONF_RTOS_PRESENT)
+#if defined(MBED_STACK_STATS_ENABLED) && MBED_STACK_STATS_ENABLED
 MBED_UNUSED static void send_stack_info()
 {
     mutex->lock();
@@ -162,7 +164,6 @@ static void enqeue_thread_info(osThreadId_t id)
     thread_info.entry = (uint32_t)id;
     thread_info.stack_size = osThreadGetStackSize(id);
     thread_info.max_stack = thread_info.stack_size - osThreadGetStackSpace(id);
-    thread_info.stack_name = osThreadGetName(id);
     queue->push(thread_info);
 }
 
@@ -173,10 +174,6 @@ static void deque_and_print_thread_info()
     MBED_ASSERT(ret);
     uint32_t pos = 0;
     buf[pos++] = '\"';
-    pos += print_str(buf + pos, thread_info.stack_name);
-    buf[pos++] = '\"';
-    buf[pos++] = ',';
-    buf[pos++] = '\"';
     pos += print_hex(buf + pos, thread_info.entry);
     buf[pos++] = '\"';
     buf[pos++] = ',';
@@ -186,16 +183,6 @@ static void deque_and_print_thread_info()
     buf[pos++] = 0;
     greentea_send_kv("__thread_info", buf);
 }
-
-static uint32_t print_str(char *buf, const char *value)
-{
-    uint32_t pos = 0;
-    for (pos = 0; pos < strlen(value); pos++) {
-        buf[pos] = value[pos];
-    }
-    return pos;
-}
-
 
 static uint32_t print_hex(char *buf, uint32_t value)
 {

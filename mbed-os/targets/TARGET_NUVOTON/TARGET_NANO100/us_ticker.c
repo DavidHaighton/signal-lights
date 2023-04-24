@@ -38,11 +38,7 @@
          Vector table relocation is not actually supported for low-resource target. */
 void TMR0_IRQHandler(void);
 
-#if MBED_CONF_TARGET_HXT_PRESENT
 static const struct nu_modinit_s timer0_modinit = {TIMER_0, TMR0_MODULE, CLK_CLKSEL1_TMR0_S_HXT, 0, TMR0_RST, TMR0_IRQn, (void *) TMR0_IRQHandler};
-#else
-static const struct nu_modinit_s timer0_modinit = {TIMER_0, TMR0_MODULE, CLK_CLKSEL1_TMR0_S_HIRC, 0, TMR0_RST, TMR0_IRQn, (void *) TMR0_IRQHandler};
-#endif
 
 #define TIMER_MODINIT      timer0_modinit
 
@@ -62,14 +58,14 @@ void us_ticker_init(void)
     }
     ticker_inited = 1;
 
+    // Reset IP
+    SYS_ResetModule(TIMER_MODINIT.rsetidx);
+
     // Select IP clock source
     CLK_SetModuleClock(TIMER_MODINIT.clkidx, TIMER_MODINIT.clksrc, TIMER_MODINIT.clkdiv);
 
     // Enable IP clock
     CLK_EnableModuleClock(TIMER_MODINIT.clkidx);
-
-    // Reset IP
-    SYS_ResetModule(TIMER_MODINIT.rsetidx);
 
     TIMER_T *timer_base = (TIMER_T *) NU_MODBASE(TIMER_MODINIT.modname);
 

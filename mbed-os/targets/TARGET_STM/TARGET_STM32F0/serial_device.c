@@ -1,30 +1,45 @@
 /* mbed Microcontroller Library
- * SPDX-License-Identifier: BSD-3-Clause
- ******************************************************************************
- *
- * Copyright (c) 2015-2020 STMicroelectronics.
+ *******************************************************************************
+ * Copyright (c) 2017, STMicroelectronics
  * All rights reserved.
  *
- * This software component is licensed by ST under BSD 3-Clause license,
- * the "License"; You may not use this file except in compliance with the
- * License. You may obtain a copy of the License at:
- *                        opensource.org/licenses/BSD-3-Clause
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
  *
- ******************************************************************************
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ * 3. Neither the name of STMicroelectronics nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *******************************************************************************
  */
 
 #if DEVICE_SERIAL
 
 #include "serial_api_hal.h"
 
-#if defined (TARGET_STM32F031x6)
+#if defined (TARGET_STM32F031K6)
 #define UART_NUM (1)
-#elif defined (TARGET_STM32F030x8) || defined (TARGET_STM32F051x8) || defined (TARGET_STM32F042x6)
+#elif defined (TARGET_STM32F030R8) || defined (TARGET_STM32F051R8) || defined (TARGET_STM32F042K6)
 #define UART_NUM (2)
-#elif defined (TARGET_STM32F070xB) || defined (TARGET_STM32F072xB)
+#elif defined (TARGET_STM32F070RB) || defined (TARGET_STM32F072RB)
 #define UART_NUM (4)
 #else
-#define UART_NUM (8) // max value (TARGET_STM32F091xC)
+#define UART_NUM (8) // max value (TARGET_STM32F091RC)
 #endif
 
 uint32_t serial_irq_ids[UART_NUM] = {0};
@@ -248,15 +263,8 @@ int serial_getc(serial_t *obj)
     struct serial_s *obj_s = SERIAL_S(obj);
     UART_HandleTypeDef *huart = &uart_handlers[obj_s->index];
 
-    /* Computation of UART mask to apply to RDR register */
-    UART_MASK_COMPUTATION(huart);
-    uint16_t uhMask = huart->Mask;
-
     while (!serial_readable(obj));
-    /* When receiving with the parity enabled, the value read in the MSB bit
-     * is the received parity bit.
-     */
-    return (int)(huart->Instance->RDR & uhMask);
+    return (int)(huart->Instance->RDR & (uint16_t)0xFF);
 }
 
 void serial_putc(serial_t *obj, int c)
@@ -265,12 +273,7 @@ void serial_putc(serial_t *obj, int c)
     UART_HandleTypeDef *huart = &uart_handlers[obj_s->index];
 
     while (!serial_writable(obj));
-    /* When transmitting with the parity enabled (PCE bit set to 1 in the
-     * USART_CR1 register), the value written in the MSB (bit 7 or bit 8
-     * depending on the data length) has no effect because it is replaced
-     * by the parity.
-     */
-    huart->Instance->TDR = (uint16_t)(c & 0x1FFU);
+    huart->Instance->TDR = (uint32_t)(c & (uint16_t)0xFF);
 }
 
 void serial_clear(serial_t *obj)
@@ -278,9 +281,8 @@ void serial_clear(serial_t *obj)
     struct serial_s *obj_s = SERIAL_S(obj);
     UART_HandleTypeDef *huart = &uart_handlers[obj_s->index];
 
-    /* Clear RXNE and error flags */
-    volatile uint32_t tmpval __attribute__((unused)) = huart->Instance->RDR;
-    HAL_UART_ErrorCallback(huart);
+    huart->TxXferCount = 0;
+    huart->RxXferCount = 0;
 }
 
 void serial_break_set(serial_t *obj)
@@ -567,6 +569,13 @@ uint8_t serial_rx_active(serial_t *obj)
     return (((HAL_UART_GetState(huart) & HAL_UART_STATE_BUSY_RX) == HAL_UART_STATE_BUSY_RX) ? 1 : 0);
 }
 
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+    if (__HAL_UART_GET_FLAG(huart, UART_FLAG_TC) != RESET) {
+        __HAL_UART_CLEAR_FLAG(huart, UART_CLEAR_TCF);
+    }
+}
+
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
     if (__HAL_UART_GET_FLAG(huart, UART_FLAG_PE) != RESET) {
@@ -674,6 +683,9 @@ void serial_tx_abort_asynch(serial_t *obj)
 
     __HAL_UART_DISABLE_IT(huart, UART_IT_TC);
     __HAL_UART_DISABLE_IT(huart, UART_IT_TXE);
+
+    // clear flags
+    __HAL_UART_CLEAR_FLAG(huart, UART_CLEAR_TCF);
 
     // reset states
     huart->TxXferCount = 0;

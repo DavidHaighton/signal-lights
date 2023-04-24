@@ -1,20 +1,21 @@
 /* mbed Microcontroller Library
- * SPDX-License-Identifier: BSD-3-Clause
- ******************************************************************************
+ * Copyright (c) 2017 ARM Limited
  *
- * Copyright (c) 2016-2020 STMicroelectronics.
- * All rights reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * This software component is licensed by ST under BSD 3-Clause license,
- * the "License"; You may not use this file except in compliance with the
- * License. You may obtain a copy of the License at:
- *                        opensource.org/licenses/BSD-3-Clause
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- ******************************************************************************
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 #include "flash_api.h"
-#include "platform/mbed_critical.h"
+#include "mbed_critical.h"
 
 #if DEVICE_FLASH
 #include "mbed_assert.h"
@@ -33,6 +34,27 @@ int32_t flash_free(flash_t *obj)
     return 0;
 }
 
+static int32_t flash_unlock(void)
+{
+    /* Allow Access to Flash control registers and user Falsh */
+    if (HAL_FLASH_Unlock()) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+static int32_t flash_lock(void)
+{
+    /* Disable the Flash option control register access (recommended to protect
+    the option Bytes against possible unwanted operations) */
+    if (HAL_FLASH_Lock()) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
 int32_t flash_erase_sector(flash_t *obj, uint32_t address)
 {
     uint32_t PAGEError = 0;
@@ -44,11 +66,9 @@ int32_t flash_erase_sector(flash_t *obj, uint32_t address)
         return -1;
     }
 
-    if (HAL_FLASH_Unlock() != HAL_OK) {
+    if (flash_unlock() != HAL_OK) {
         return -1;
     }
-
-    core_util_critical_section_enter();
 
     __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_OPTVERR | FLASH_FLAG_EOP | FLASH_FLAG_PGAERR | FLASH_FLAG_WRPERR);
     /* MBED HAL erases 1 sector at a time */
@@ -66,11 +86,7 @@ int32_t flash_erase_sector(flash_t *obj, uint32_t address)
         status = -1;
     }
 
-    core_util_critical_section_exit();
-
-    if (HAL_FLASH_Lock() != HAL_OK) {
-        return -1;
-    }
+    flash_lock();
 
     return status;
 
@@ -91,7 +107,7 @@ int32_t flash_program_page(flash_t *obj, uint32_t address,
         return -1;
     }
 
-    if (HAL_FLASH_Unlock() != HAL_OK) {
+    if (flash_unlock() != HAL_OK) {
         return -1;
     }
 
@@ -125,9 +141,7 @@ int32_t flash_program_page(flash_t *obj, uint32_t address,
         }
     }
 
-    if (HAL_FLASH_Lock() != HAL_OK) {
-        return -1;
-    }
+    flash_lock();
 
     return status;
 }

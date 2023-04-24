@@ -76,7 +76,7 @@ void gpio_irq_2(void) { handle_irq(2); }
 void gpio_irq_3(void) { handle_irq(3); }
 void gpio_irq_4(void) { handle_irq(4); }
 
-int gpio_irq_init(gpio_irq_t *obj, PinName name, gpio_irq_handler handler, uintptr_t context)
+int gpio_irq_init(gpio_irq_t *obj, PinName name, gpio_irq_handler handler, uint32_t id)
 {
     if (name == NC) {
         return -1;
@@ -91,7 +91,7 @@ int gpio_irq_init(gpio_irq_t *obj, PinName name, gpio_irq_handler handler, uintp
 
     obj->port = port;
     obj->pin = pin;
-    obj->id = context;
+    obj->id = id;
     objs[port][pin] = obj;
 
     /* register handlers */

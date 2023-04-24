@@ -1,7 +1,6 @@
 """
 mbed SDK
 Copyright (c) 2016-2019 ARM Limited
-SPDX-License-Identifier: Apache-2.0
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -122,13 +121,10 @@ class EclipseArmc5(Eclipse, Armc5):
     @classmethod
     def is_target_supported(cls, target_name):
         target = TARGET_MAP[target_name]
-        if not target.is_TFM_target:
-            if int(target.build_tools_metadata["version"]) > 0:
-                return "ARMC5" in target.supported_toolchains
-            else:
-                return True
+        if int(target.build_tools_metadata["version"]) > 0:
+            return "ARMC5" in target.supported_toolchains
         else:
-            return False
+            return True
 
 class EclipseIAR(Eclipse, IAR):
     LOAD_EXE = True

@@ -1,8 +1,5 @@
 /* mbed Microcontroller Library
- *
- * Copyright (C) 2019, Toshiba Electronic Device Solutions Corporation
- *
- * SPDX-License-Identifier: Apache-2.0
+ * (C)Copyright TOSHIBA ELECTRONIC DEVICES & STORAGE CORPORATION 2018 All rights reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -131,16 +128,8 @@ typedef enum {
 } GPIO_IRQName;
 
 // DAP UART
-#if defined(MBED_CONF_TARGET_STDIO_UART_TX)
-#define STDIO_UART_TX MBED_CONF_TARGET_STDIO_UART_TX
-#else
-#define STDIO_UART_TX CONSOLE_TX
-#endif
-#if defined(MBED_CONF_TARGET_STDIO_UART_RX)
-#define STDIO_UART_RX MBED_CONF_TARGET_STDIO_UART_RX
-#else
-#define STDIO_UART_RX CONSOLE_RX
-#endif
+#define STDIO_UART_TX     USBTX
+#define STDIO_UART_RX     USBRX
 
 #define SERIAL_TX         PU0
 #define SERIAL_RX         PU1
@@ -156,7 +145,7 @@ typedef enum {
 #define MBED_UART5        PJ1, PJ0
 #define MBED_UART6        PG4, PG5
 #define MBED_UART7        PJ6, PJ7
-#define MBED_UARTUSB      CONSOLE_TX, CONSOLE_RX
+#define MBED_UARTUSB      USBTX, USBRX
 
 // SDA SCK
 #define MBED_I2C0         PG2, PG3

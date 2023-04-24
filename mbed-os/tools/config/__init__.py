@@ -1,6 +1,6 @@
 """
 mbed SDK
-Copyright (c) 2016-2020 ARM Limited
+Copyright (c) 2016 ARM Limited
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -69,8 +69,7 @@ BOOTLOADER_OVERRIDES = ROM_OVERRIDES | RAM_OVERRIDES | DELIVERY_OVERRIDES
 
 
 ALLOWED_FEATURES = [
-    "BOOTLOADER", "BLE", "LWIP", "STORAGE", "NANOSTACK", "CRYPTOCELL310", "PSA",
-    "EXPERIMENTAL_API",
+    "BOOTLOADER", "BLE", "LWIP", "STORAGE", "NANOSTACK", "CRYPTOCELL310",
 ]
 
 # List of all possible ram memories that can be available for a target
@@ -512,9 +511,7 @@ class Config(object):
             resolver = RefResolver(uri, schema)
             validator = Draft4Validator(schema, resolver=resolver)
 
-            errors = sorted(
-                validator.iter_errors(self.app_config_data), key=str
-            )
+            errors = sorted(validator.iter_errors(self.app_config_data))
 
             if errors:
                 raise ConfigException("; ".join(
@@ -586,7 +583,7 @@ class Config(object):
             resolver = RefResolver(uri, schema_file)
             validator = Draft4Validator(schema_file, resolver=resolver)
 
-            errors = sorted(validator.iter_errors(cfg), key=str)
+            errors = sorted(validator.iter_errors(cfg))
 
             if errors:
                 raise ConfigException("; ".join(
@@ -707,6 +704,25 @@ class Config(object):
             )
         if hasattr(self.target, "mbed_{}_size".format(memory_type)):
             mem_size = getattr(self.target, "mbed_{}_size".format(memory_type))
+        if (
+            self.target.is_PSA_non_secure_target or
+            self.target.is_PSA_secure_target
+        ):
+            config, _ = self.get_config_data()
+            if self.target.is_PSA_secure_target:
+                mem_start = config.get(
+                    "target.secure-{}-start".format(memory_type), mem_start
+                ).value
+                mem_size = config.get(
+                    "target.secure-{}-size".format(memory_type), mem_size
+                ).value
+            elif self.target.is_PSA_non_secure_target:
+                mem_start = config.get(
+                    "target.non-secure-{}-start".format(memory_type), mem_start
+                ).value
+                mem_size = config.get(
+                    "target.non-secure-{}-size".format(memory_type), mem_size
+                ).value
         if mem_start and not isinstance(mem_start, int):
             mem_start = int(mem_start, 0)
         if mem_size and not isinstance(mem_size, int):
@@ -780,12 +796,12 @@ class Config(object):
             start, size = self._get_primary_memory_override(
                 active_memory.lower()
             )
-            if start is None:
+            if not start:
                 raise ConfigException(
                     "Bootloader not supported on this target. {} "
                     "start not found in targets.json.".format(active_memory)
                 )
-            if size is None:
+            if not size:
                 raise ConfigException(
                     "Bootloader not supported on this target. {} "
                     "size not found in targets.json.".format(active_memory)
@@ -1135,7 +1151,7 @@ class Config(object):
                                                     label)
                     elif (
                         name.startswith("target.") and
-                        (unit_kind == "application" or
+                        (unit_kind is "application" or
                          name in BOOTLOADER_OVERRIDES)
                     ):
                         _, attribute = name.split(".")
@@ -1338,13 +1354,10 @@ class Config(object):
         self.cumulative_overrides['features']\
             .update_target(self.target)
 
-        # Features that don't appear in ALLOWED_FEATURES should be removed
-        # with a warning so that they don't do anything unexpected.
-        # Iterate over a copy of the set to remove them safely.
-        for feature in list(self.target.features):
+        for feature in self.target.features:
             if feature not in ALLOWED_FEATURES:
-                print("[WARNING] Feature '%s' is not a supported feature" % feature)
-                self.target.features.remove(feature)
+                raise ConfigException(
+                    "Feature '%s' is not a supported features" % feature)
 
         return self.target.features
 

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) Maxim Integrated Products, Inc., All Rights Reserved.
+ * Copyright (C) 2016 Maxim Integrated Products, Inc., All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -33,7 +33,6 @@
 
 #include "sleep_api.h"
 #include "lp.h"
-#include "clkman.h"
 
 void hal_sleep(void)
 {
@@ -43,7 +42,5 @@ void hal_sleep(void)
 // Low-power stop mode
 void hal_deepsleep(void)
 {
-    MXC_CLKMAN->clk_gate_ctrl1 &= ~MXC_F_CLKMAN_CLK_GATE_CTRL1_TIMER0_CLK_GATER;
     hal_sleep();
-    MXC_CLKMAN->clk_gate_ctrl1 |= MXC_F_CLKMAN_CLK_GATE_CTRL1_TIMER0_CLK_GATER;
 }

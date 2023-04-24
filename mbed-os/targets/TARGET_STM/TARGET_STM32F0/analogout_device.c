@@ -1,18 +1,30 @@
 /* mbed Microcontroller Library
- * SPDX-License-Identifier: BSD-3-Clause
- ******************************************************************************
- *
- * Copyright (c) 2015-2020 STMicroelectronics.
+ * Copyright (c) 2015, STMicroelectronics
  * All rights reserved.
  *
- * This software component is licensed by ST under BSD 3-Clause license,
- * the "License"; You may not use this file except in compliance with the
- * License. You may obtain a copy of the License at:
- *                        opensource.org/licenses/BSD-3-Clause
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
  *
- ******************************************************************************
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ * 3. Neither the name of STMicroelectronics nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 #include "mbed_assert.h"
 #include "analogout_api.h"
 
@@ -22,11 +34,6 @@
 #include "pinmap.h"
 #include "mbed_error.h"
 #include "PeripheralPins.h"
-
-static int channel1_used = 0;
-#if defined(DAC_CHANNEL_2)
-static int channel2_used = 0;
-#endif
 
 void analogout_init(dac_t *obj, PinName pin)
 {
@@ -77,43 +84,19 @@ void analogout_init(dac_t *obj, PinName pin)
     if (HAL_DAC_ConfigChannel(&obj->handle, &sConfig, obj->channel) != HAL_OK) {
         error("HAL_DAC_ConfigChannel failed");
     }
-    
-    if (obj->channel == DAC_CHANNEL_1) {
-        channel1_used = 1;
-    }
-#if defined(DAC_CHANNEL_2)
-    if (obj->channel == DAC_CHANNEL_2) {
-        channel2_used = 1;
-    }
-#endif
 
     analogout_write_u16(obj, 0);
-    HAL_DAC_Start(&obj->handle, obj->channel);
 }
 
 void analogout_free(dac_t *obj)
 {
-    if (obj->channel == DAC_CHANNEL_1) {
-        channel1_used = 0;
-    }
-#if defined(DAC_CHANNEL_2)
-    if (obj->channel == DAC_CHANNEL_2) {
-        channel2_used = 0;
-    }
-#endif
-    if ((channel1_used == 0)
-#if defined(DAC_CHANNEL_2)
-        && (channel2_used == 0)
-#endif
-        ) {
-        // Reset DAC and disable clock
-        __HAL_RCC_DAC1_FORCE_RESET();
-        __HAL_RCC_DAC1_RELEASE_RESET();
-        __HAL_RCC_DAC1_CLK_DISABLE();
-    }
+    // Reset DAC and disable clock
+    __HAL_RCC_DAC1_FORCE_RESET();
+    __HAL_RCC_DAC1_RELEASE_RESET();
+    __HAL_RCC_DAC1_CLK_DISABLE();
 
-    // Configure GPIO back to reset value
-    pin_function(obj->pin, STM_PIN_DATA(STM_MODE_ANALOG, GPIO_NOPULL, 0));
+    // Configure GPIO
+    pin_function(obj->pin, STM_PIN_DATA(STM_MODE_INPUT, GPIO_NOPULL, 0));
 }
 
 const PinMap *analogout_pinmap()

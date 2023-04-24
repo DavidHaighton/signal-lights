@@ -1,6 +1,5 @@
 /* mbed Microcontroller Library
  * Copyright (c) 2006-2013 ARM Limited
- * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +27,7 @@
 
 #define CHANNEL_NUM    160
 
-static uintptr_t channel_contexts[CHANNEL_NUM] = {0};
+static uint32_t channel_ids[CHANNEL_NUM] = {0};
 static gpio_irq_handler irq_handler;
 /* Array of PORT peripheral base address. */
 static PORT_Type *const port_addrs[] = PORT_BASE_PTRS;
@@ -51,8 +50,8 @@ static void handle_interrupt_in(PortName port, int ch_base)
 
     for (i = 0; i < 32; i++) {
         if (interrupt_flags & (1 << i)) {
-            uintptr_t context = channel_contexts[ch_base + i];
-            if (context == 0) {
+            uint32_t id = channel_ids[ch_base + i];
+            if (id == 0) {
                 continue;
             }
 
@@ -74,7 +73,7 @@ static void handle_interrupt_in(PortName port, int ch_base)
                     break;
             }
             if (event != IRQ_NONE) {
-                irq_handler(context, event);
+                irq_handler(id, event);
             }
         }
     }
@@ -106,7 +105,7 @@ void gpio_irqE(void)
     handle_interrupt_in(PortE, 128);
 }
 
-int gpio_irq_init(gpio_irq_t *obj, PinName pin, gpio_irq_handler handler, uintptr_t context)
+int gpio_irq_init(gpio_irq_t *obj, PinName pin, gpio_irq_handler handler, uint32_t id)
 {
     if (pin == NC) {
         return -1;
@@ -148,14 +147,14 @@ int gpio_irq_init(gpio_irq_t *obj, PinName pin, gpio_irq_handler handler, uintpt
     NVIC_EnableIRQ(port_irqs[obj->port]);
 
     obj->ch = ch_base + obj->pin;
-    channel_contexts[obj->ch] = context;
+    channel_ids[obj->ch] = id;
 
     return 0;
 }
 
 void gpio_irq_free(gpio_irq_t *obj)
 {
-    channel_contexts[obj->ch] = 0;
+    channel_ids[obj->ch] = 0;
 }
 
 void gpio_irq_set(gpio_irq_t *obj, gpio_irq_event event, uint32_t enable)

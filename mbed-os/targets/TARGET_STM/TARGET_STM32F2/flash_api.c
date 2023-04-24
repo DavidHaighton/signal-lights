@@ -1,7 +1,5 @@
 /* mbed Microcontroller Library
  * Copyright (c) 2017 ARM Limited
- * Copyright (c) 2017 STMicroelectronics
- * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +23,27 @@
 static uint32_t GetSector(uint32_t Address);
 static uint32_t GetSectorSize(uint32_t Sector);
 
+static int32_t flash_unlock(void)
+{
+    /* Allow Access to Flash control registers and user Falsh */
+    if (HAL_FLASH_Unlock()) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+static int32_t flash_lock(void)
+{
+    /* Disable the Flash option control register access (recommended to protect
+    the option Bytes against possible unwanted operations) */
+    if (HAL_FLASH_Lock()) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
 int32_t flash_init(flash_t *obj)
 {
     return 0;
@@ -46,11 +65,9 @@ int32_t flash_erase_sector(flash_t *obj, uint32_t address)
         return -1;
     }
 
-    if (HAL_FLASH_Unlock() != HAL_OK) {
+    if (flash_unlock() != HAL_OK) {
         return -1;
     }
-
-    core_util_critical_section_enter();
 
     /* Get the 1st sector to erase */
     FirstSector = GetSector(address);
@@ -65,11 +82,7 @@ int32_t flash_erase_sector(flash_t *obj, uint32_t address)
         status = -1;
     }
 
-    core_util_critical_section_exit();
-
-    if (HAL_FLASH_Lock() != HAL_OK) {
-        return -1;
-    }
+    flash_lock();
 
     return status;
 }
@@ -82,7 +95,7 @@ int32_t flash_program_page(flash_t *obj, uint32_t address, const uint8_t *data, 
         return -1;
     }
 
-    if (HAL_FLASH_Unlock() != HAL_OK) {
+    if (flash_unlock() != HAL_OK) {
         return -1;
     }
 
@@ -109,9 +122,7 @@ int32_t flash_program_page(flash_t *obj, uint32_t address, const uint8_t *data, 
         }
     }
 
-    if (HAL_FLASH_Lock() != HAL_OK) {
-        return -1;
-    }
+    flash_lock();
 
     return status;
 }

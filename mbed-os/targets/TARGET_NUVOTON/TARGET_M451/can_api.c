@@ -31,7 +31,7 @@
  #define NU_CAN_DEBUG    0
  #define CAN_NUM         1
  
- static uintptr_t can_irq_contexts[CAN_NUM] = {0};
+ static uint32_t can_irq_ids[CAN_NUM] = {0};
  static can_irq_handler can0_irq_handler;
 
  
@@ -52,20 +52,17 @@ void can_init_freq(can_t *obj, PinName rd, PinName td, int hz)
     const struct nu_modinit_s *modinit = get_modinit(obj->can, can_modinit_tab);
     MBED_ASSERT(modinit != NULL);
     MBED_ASSERT(modinit->modname == obj->can);
-
-    obj->pin_rd = rd;
-    obj->pin_td = td;
-
-    pinmap_pinout(td, PinMap_CAN_TD);
-    pinmap_pinout(rd, PinMap_CAN_RD);
-
-    // Enable IP clock
-    CLK_EnableModuleClock(modinit->clkidx);
-
+    
     // Reset this module
     SYS_ResetModule(modinit->rsetidx);
+    
+    // Enable IP clock
+    CLK_EnableModuleClock(modinit->clkidx);
      
     obj->index = 0;
+    
+    pinmap_pinout(td, PinMap_CAN_TD);
+    pinmap_pinout(rd, PinMap_CAN_RD);
     
     /* For M453 mbed Board Transmitter Setting (RS Pin) */
     GPIO_SetMode(PA, BIT0| BIT1, GPIO_MODE_OUTPUT);    
@@ -75,7 +72,7 @@ void can_init_freq(can_t *obj, PinName rd, PinName td, int hz)
     CAN_Open((CAN_T *)NU_MODBASE(obj->can), hz, CAN_NORMAL_MODE);
     
     can_filter(obj, 0, 0, CANStandard, 0);
-}
+ }
 
 
 void can_init(can_t *obj, PinName rd, PinName td)
@@ -96,12 +93,6 @@ void can_free(can_t *obj)
     SYS_ResetModule(modinit->rsetidx);
     
     CLK_DisableModuleClock(modinit->clkidx);
-
-    /* Free up pins */
-    gpio_set(obj->pin_rd);
-    gpio_set(obj->pin_td);
-    obj->pin_rd = NC;
-    obj->pin_td = NC;
 }
 
 int can_frequency(can_t *obj, int hz)
@@ -125,34 +116,34 @@ static void can_irq(CANName name, int id)
         /**************************/
         if(can->STATUS & CAN_STATUS_RXOK_Msk) {
             can->STATUS &= ~CAN_STATUS_RXOK_Msk;   /* Clear Rx Ok status*/
-            can0_irq_handler(can_irq_contexts[id], IRQ_RX);
+            can0_irq_handler(can_irq_ids[id], IRQ_RX);
         }
 
         if(can->STATUS & CAN_STATUS_TXOK_Msk) {
             can->STATUS &= ~CAN_STATUS_TXOK_Msk;    /* Clear Tx Ok status*/
-            can0_irq_handler(can_irq_contexts[id], IRQ_TX);
+            can0_irq_handler(can_irq_ids[id], IRQ_TX);
         }
 
         /**************************/
         /* Error Status interrupt */
         /**************************/
         if(can->STATUS & CAN_STATUS_EWARN_Msk) {
-            can0_irq_handler(can_irq_contexts[id], IRQ_ERROR);
+            can0_irq_handler(can_irq_ids[id], IRQ_ERROR);
         }
 
         if(can->STATUS & CAN_STATUS_BOFF_Msk) {
-            can0_irq_handler(can_irq_contexts[id], IRQ_BUS);
+            can0_irq_handler(can_irq_ids[id], IRQ_BUS);
         }
     } else if (u8IIDRstatus!=0) {
 
-        can0_irq_handler(can_irq_contexts[id], IRQ_OVERRUN);
+        can0_irq_handler(can_irq_ids[id], IRQ_OVERRUN);
         
         CAN_CLR_INT_PENDING_BIT(can, ((can->IIDR) -1));      /* Clear Interrupt Pending */
 
     } else if(can->WU_STATUS == 1) {
 
         can->WU_STATUS = 0;                       /* Write '0' to clear */
-        can0_irq_handler(can_irq_contexts[id], IRQ_WAKEUP);
+        can0_irq_handler(can_irq_ids[id], IRQ_WAKEUP);
     }
 }
 
@@ -161,17 +152,17 @@ void CAN0_IRQHandler(void)
     can_irq(CAN_0, 0);
 }
 
-void can_irq_init(can_t *obj, can_irq_handler handler, uintptr_t context)
+void can_irq_init(can_t *obj, can_irq_handler handler, uint32_t id)
 {
     can0_irq_handler = handler;
-    can_irq_contexts[obj->index] = context; 
+    can_irq_ids[obj->index] = id; 
 }
 
 void can_irq_free(can_t *obj)
 {
     CAN_DisableInt((CAN_T *)NU_MODBASE(obj->can), (CAN_CON_IE_Msk|CAN_CON_SIE_Msk|CAN_CON_EIE_Msk));
     
-    can_irq_contexts[obj->index] = 0;
+    can_irq_ids[obj->index] = 0;
     
     NVIC_DisableIRQ(CAN0_IRQn);    
 }
@@ -285,17 +276,7 @@ int can_mode(can_t *obj, CanMode mode)
 
 int can_filter(can_t *obj, uint32_t id, uint32_t mask, CANFormat format, int32_t handle)
 {
-    uint32_t numask = mask;
-    if( numask == 0x0000 )
-    {
-      return CAN_SetRxMsg((CAN_T *)NU_MODBASE(obj->can), handle, (uint32_t)format, id);
-    }
-    if( format == CANStandard )
-    {
-      numask = (mask << 18);
-    }
-    numask = (numask | CAN_IF_MASK2_MDIR_Msk | CAN_IF_MASK2_MXTD_Msk);
-    return CAN_SetRxMsgAndMsk((CAN_T *)NU_MODBASE(obj->can), handle, (uint32_t)format, id, numask);
+    return CAN_SetRxMsg((CAN_T *)NU_MODBASE(obj->can), handle , (uint32_t)format, id);
 }
 
 

@@ -1,7 +1,5 @@
-/*
- * Copyright (c) 2015-2016, Nuvoton Technology Corporation
- *
- * SPDX-License-Identifier: Apache-2.0
+/* mbed Microcontroller Library
+ * Copyright (c) 2015-2016 Nuvoton
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +23,6 @@
 #include "cmsis.h"
 #include "pinmap.h"
 #include "PeripheralPins.h"
-#include "gpio_api.h"
 #include "nu_modutil.h"
 #include "nu_miscutil.h"
 #include "nu_bitutil.h"
@@ -34,7 +31,7 @@
 #define NU_CAN_DEBUG    0
 #define CAN_NUM         2
 
-static uintptr_t can_irq_contexts[CAN_NUM] = {0};
+static uint32_t can_irq_ids[CAN_NUM] = {0};
 static can_irq_handler can0_irq_handler;
 static can_irq_handler can1_irq_handler;
 
@@ -62,26 +59,22 @@ void can_init_freq(can_t *obj, PinName rd, PinName td, int hz)
     MBED_ASSERT(modinit != NULL);
     MBED_ASSERT(modinit->modname == (int) obj->can);
 
-    obj->pin_rd = rd;
-    obj->pin_td = td;
-
-    pinmap_pinout(td, PinMap_CAN_TD);
-    pinmap_pinout(rd, PinMap_CAN_RD);
-
-    // Enable IP clock
-    CLK_EnableModuleClock(modinit->clkidx);
-
     // Reset this module
     SYS_ResetModule(modinit->rsetidx);
 
     NVIC_DisableIRQ(CAN0_IRQn);
-    NVIC_DisableIRQ(CAN1_IRQn);    
+    NVIC_DisableIRQ(CAN1_IRQn);
+
+    // Enable IP clock
+    CLK_EnableModuleClock(modinit->clkidx);
 
     if(obj->can == CAN_1) {
         obj->index = 1;
     } else
         obj->index = 0;
 
+    pinmap_pinout(td, PinMap_CAN_TD);
+    pinmap_pinout(rd, PinMap_CAN_RD);
 #if 0
     /* TBD: For M487 mbed Board Transmitter Setting (RS Pin) */
     GPIO_SetMode(PA, BIT2| BIT3, GPIO_MODE_OUTPUT);
@@ -110,12 +103,6 @@ void can_free(can_t *obj)
     SYS_ResetModule(modinit->rsetidx);
 
     CLK_DisableModuleClock(modinit->clkidx);
-
-    /* Free up pins */
-    gpio_set(obj->pin_rd);
-    gpio_set(obj->pin_td);
-    obj->pin_rd = NC;
-    obj->pin_td = NC;
 }
 
 int can_frequency(can_t *obj, int hz)
@@ -140,17 +127,17 @@ static void can_irq(CANName name, int id)
         if(can->STATUS & CAN_STATUS_RXOK_Msk) {
             can->STATUS &= ~CAN_STATUS_RXOK_Msk;   /* Clear Rx Ok status*/
             if(id)
-                can1_irq_handler(can_irq_contexts[id], IRQ_RX);
+                can1_irq_handler(can_irq_ids[id], IRQ_RX);
             else
-                can0_irq_handler(can_irq_contexts[id], IRQ_RX);
+                can0_irq_handler(can_irq_ids[id], IRQ_RX);
         }
 
         if(can->STATUS & CAN_STATUS_TXOK_Msk) {
             can->STATUS &= ~CAN_STATUS_TXOK_Msk;    /* Clear Tx Ok status*/
             if(id)
-                can1_irq_handler(can_irq_contexts[id], IRQ_TX);
+                can1_irq_handler(can_irq_ids[id], IRQ_TX);
             else
-                can0_irq_handler(can_irq_contexts[id], IRQ_TX);
+                can0_irq_handler(can_irq_ids[id], IRQ_TX);
 
         }
 
@@ -159,23 +146,23 @@ static void can_irq(CANName name, int id)
         /**************************/
         if(can->STATUS & CAN_STATUS_EWARN_Msk) {
             if(id)
-                can1_irq_handler(can_irq_contexts[id], IRQ_ERROR);
+                can1_irq_handler(can_irq_ids[id], IRQ_ERROR);
             else
-                can0_irq_handler(can_irq_contexts[id], IRQ_ERROR);
+                can0_irq_handler(can_irq_ids[id], IRQ_ERROR);
         }
 
         if(can->STATUS & CAN_STATUS_BOFF_Msk) {
             if(id)
-                can1_irq_handler(can_irq_contexts[id], IRQ_BUS);
+                can1_irq_handler(can_irq_ids[id], IRQ_BUS);
             else
-                can0_irq_handler(can_irq_contexts[id], IRQ_BUS);
+                can0_irq_handler(can_irq_ids[id], IRQ_BUS);
         }
     } else if (u8IIDRstatus!=0) {
 
         if(id)
-            can1_irq_handler(can_irq_contexts[id], IRQ_OVERRUN);
+            can1_irq_handler(can_irq_ids[id], IRQ_OVERRUN);
         else
-            can0_irq_handler(can_irq_contexts[id], IRQ_OVERRUN);
+            can0_irq_handler(can_irq_ids[id], IRQ_OVERRUN);
 
         CAN_CLR_INT_PENDING_BIT(can, ((can->IIDR) -1));      /* Clear Interrupt Pending */
 
@@ -183,9 +170,9 @@ static void can_irq(CANName name, int id)
 
         can->WU_STATUS = 0;                       /* Write '0' to clear */
         if(id)
-            can1_irq_handler(can_irq_contexts[id], IRQ_WAKEUP);
+            can1_irq_handler(can_irq_ids[id], IRQ_WAKEUP);
         else
-            can0_irq_handler(can_irq_contexts[id], IRQ_WAKEUP);
+            can0_irq_handler(can_irq_ids[id], IRQ_WAKEUP);
     }
 }
 
@@ -199,13 +186,13 @@ void CAN1_IRQHandler(void)
     can_irq(CAN_1, 1);
 }
 
-void can_irq_init(can_t *obj, can_irq_handler handler, uintptr_t context)
+void can_irq_init(can_t *obj, can_irq_handler handler, uint32_t id)
 {
     if(obj->index)
         can1_irq_handler = handler;
     else
         can0_irq_handler = handler;
-    can_irq_contexts[obj->index] = context;
+    can_irq_ids[obj->index] = id;
 
 }
 
@@ -213,7 +200,7 @@ void can_irq_free(can_t *obj)
 {
     CAN_DisableInt((CAN_T *)NU_MODBASE(obj->can), (CAN_CON_IE_Msk|CAN_CON_SIE_Msk|CAN_CON_EIE_Msk));
 
-    can_irq_contexts[obj->index] = 0;
+    can_irq_ids[obj->index] = 0;
 
     if(!obj->index)
         NVIC_DisableIRQ(CAN0_IRQn);
@@ -332,17 +319,7 @@ int can_mode(can_t *obj, CanMode mode)
 
 int can_filter(can_t *obj, uint32_t id, uint32_t mask, CANFormat format, int32_t handle)
 {
-    uint32_t numask = mask;
-    if( numask == 0x0000 )
-    {
-      return CAN_SetRxMsg((CAN_T *)NU_MODBASE(obj->can), handle, (uint32_t)format, id);
-    }
-    if( format == CANStandard )
-    {
-      numask = (mask << 18);
-    }
-    numask = (numask | CAN_IF_MASK2_MDIR_Msk | CAN_IF_MASK2_MXTD_Msk);
-    return CAN_SetRxMsgAndMsk((CAN_T *)NU_MODBASE(obj->can), handle, (uint32_t)format, id, numask);
+    return CAN_SetRxMsg((CAN_T *)NU_MODBASE(obj->can), handle, (uint32_t)format, id);
 }
 
 

@@ -1,6 +1,5 @@
 /* mbed Microcontroller Library
  * Copyright (c) 2006-2018 ARM Limited
- * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -76,10 +75,6 @@ struct analogin_s {
 
 /* This structure is not used by the HAL implementation. */
 struct flash_s {
-    uint8_t not_used;
-};
-
-struct trng_s {
     uint8_t not_used;
 };
 

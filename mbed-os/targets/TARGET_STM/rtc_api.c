@@ -58,30 +58,10 @@ void rtc_init(void)
     __HAL_RCC_PWR_CLK_ENABLE();
     HAL_PWR_EnableBkUpAccess();
 
-#if defined(DUAL_CORE) && (TARGET_STM32H7)
-    while (LL_HSEM_1StepLock(HSEM, CFG_HW_RCC_SEMID)) {
-    }
-#endif /* DUAL_CORE */
-#if (MBED_CONF_TARGET_RTC_CLOCK_SOURCE == USE_RTC_CLK_HSE)
-    (void)RCC_OscInitStruct;
-    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_RTC;
-#if defined(RCC_RTCCLKSOURCE_HSE_DIVX)
-    PeriphClkInitStruct.RTCClockSelection = (RCC_RTCCLKSOURCE_HSE_DIVX | RTC_HSE_DIV << 16);
-#else
-    PeriphClkInitStruct.RTCClockSelection = RCC_RTCCLKSOURCE_HSE_DIV128;
-#endif
-    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK) {
-        error("PeriphClkInitStruct RTC failed with HSE\n");
-    }
-#elif (MBED_CONF_TARGET_RTC_CLOCK_SOURCE == USE_RTC_CLK_LSE_OR_LSI) && MBED_CONF_TARGET_LSE_AVAILABLE
+#if MBED_CONF_TARGET_LSE_AVAILABLE
     RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSE;
     RCC_OscInitStruct.PLL.PLLState   = RCC_PLL_NONE;
-#if MBED_CONF_TARGET_LSE_BYPASS
-    RCC_OscInitStruct.LSEState       = RCC_LSE_BYPASS;
-#else
     RCC_OscInitStruct.LSEState       = RCC_LSE_ON;
-#endif
-
     if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
         error("Cannot initialize RTC with LSE\n");
     }
@@ -93,12 +73,8 @@ void rtc_init(void)
     if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK) {
         error("PeriphClkInitStruct RTC failed with LSE\n");
     }
-#else /* Fallback to LSI */
-#if TARGET_STM32WB
-    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI1;
-#else
+#else /*  MBED_CONF_TARGET_LSE_AVAILABLE */
     RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI;
-#endif
     RCC_OscInitStruct.PLL.PLLState   = RCC_PLL_NONE;
     RCC_OscInitStruct.LSIState       = RCC_LSI_ON;
     if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
@@ -112,15 +88,12 @@ void rtc_init(void)
     if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK) {
         error("PeriphClkInitStruct RTC failed with LSI\n");
     }
-#endif /* MBED_CONF_TARGET_RTC_CLOCK_SOURCE */
-#if defined(DUAL_CORE) && (TARGET_STM32H7)
-    LL_HSEM_ReleaseLock(HSEM, CFG_HW_RCC_SEMID, HSEM_CR_COREID_CURRENT);
-#endif /* DUAL_CORE */
+#endif /* MBED_CONF_TARGET_LSE_AVAILABLE */
 
     // Enable RTC
     __HAL_RCC_RTC_ENABLE();
 
-#if defined __HAL_RCC_RTCAPB_CLK_ENABLE /* part of STM32L4 / STM32L5 */
+#if defined __HAL_RCC_RTCAPB_CLK_ENABLE /* part of STM32L4 */
     __HAL_RCC_RTCAPB_CLK_ENABLE();
 #endif /* __HAL_RCC_RTCAPB_CLK_ENABLE */
 
@@ -148,9 +121,9 @@ void rtc_init(void)
         error("RTC initialization failed\n");
     }
 
-#if !(TARGET_STM32F1) && !(TARGET_STM32F2) && !(STM32L151xB)
+#if !(TARGET_STM32F1) && !(TARGET_STM32F2)
     /* STM32F1 : there are no shadow registers */
-    /* STM32F2/STM32L151xB : shadow registers can not be bypassed */
+    /* STM32F2 : shadow registers can not be bypassed */
     if (HAL_RTCEx_EnableBypassShadow(&RtcHandle) != HAL_OK) {
         error("EnableBypassShadow error\n");
     }
@@ -304,12 +277,12 @@ int rtc_isenabled(void)
 
 #if DEVICE_LPTICKER && !MBED_CONF_TARGET_LPTICKER_LPTIM
 
-static void _RTC_IRQHandler(void);
+static void RTC_IRQHandler(void);
 static void (*irq_handler)(void);
 
 volatile uint8_t lp_Fired = 0;
 
-static void _RTC_IRQHandler(void)
+static void RTC_IRQHandler(void)
 {
     /*  Update HAL state */
     RtcHandle.Instance = RTC;
@@ -433,17 +406,11 @@ void rtc_set_wake_up_timer(timestamp_t timestamp)
 
     RtcHandle.Instance = RTC;
     HAL_RTCEx_DeactivateWakeUpTimer(&RtcHandle);
-#if defined (RTC_WUTR_WUTOCLR) /* STM32L5 */
-    if (HAL_RTCEx_SetWakeUpTimer_IT(&RtcHandle, WakeUpCounter, RTC_WAKEUPCLOCK_RTCCLK_DIV4, 0) != HAL_OK) {
-        error("rtc_set_wake_up_timer init error\n");
-    }
-#else /* RTC_WUTR_WUTOCLR */
     if (HAL_RTCEx_SetWakeUpTimer_IT(&RtcHandle, WakeUpCounter, WakeUpClock) != HAL_OK) {
         error("rtc_set_wake_up_timer init error\n");
     }
-#endif /* RTC_WUTR_WUTOCLR */
 
-    NVIC_SetVector(RTC_WKUP_IRQn, (uint32_t)_RTC_IRQHandler);
+    NVIC_SetVector(RTC_WKUP_IRQn, (uint32_t)RTC_IRQHandler);
     irq_handler = (void (*)(void))lp_ticker_irq_handler;
     NVIC_EnableIRQ(RTC_WKUP_IRQn);
     core_util_critical_section_exit();
@@ -452,7 +419,7 @@ void rtc_set_wake_up_timer(timestamp_t timestamp)
 void rtc_fire_interrupt(void)
 {
     lp_Fired = 1;
-    NVIC_SetVector(RTC_WKUP_IRQn, (uint32_t)_RTC_IRQHandler);
+    NVIC_SetVector(RTC_WKUP_IRQn, (uint32_t)RTC_IRQHandler);
     irq_handler = (void (*)(void))lp_ticker_irq_handler;
     NVIC_SetPendingIRQ(RTC_WKUP_IRQn);
     NVIC_EnableIRQ(RTC_WKUP_IRQn);

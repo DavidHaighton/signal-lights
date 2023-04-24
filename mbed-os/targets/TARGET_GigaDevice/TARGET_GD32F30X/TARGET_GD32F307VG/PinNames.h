@@ -15,9 +15,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-/* MBED TARGET LIST: GD32_F307VG */
-
 #ifndef MBED_PINNAMES_H
 #define MBED_PINNAMES_H
 
@@ -188,8 +185,8 @@ typedef enum {
 
     SERIAL_TX   = PORTC_10,
     SERIAL_RX   = PORTC_11,
-    CONSOLE_TX       = SERIAL_TX,
-    CONSOLE_RX       = SERIAL_RX,
+    USBTX       = SERIAL_TX,
+    USBRX       = SERIAL_RX,
 
     I2C_SCL     = D15,
     I2C_SDA     = D14,

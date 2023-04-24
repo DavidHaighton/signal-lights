@@ -1,6 +1,5 @@
 /* mbed Microcontroller Library
  * Copyright (c) 2006-2018 ARM Limited
- * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,11 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-/* MBED TARGET LIST: FVP_MPS2_M0, FVP_MPS2_M0P, FVP_MPS2_M3, FVP_MPS2_M4, 
- * FVP_MPS2_M7
- */
-
 #ifndef MBED_PINNAMES_H
 #define MBED_PINNAMES_H
 
@@ -156,8 +150,8 @@ typedef enum {
     ADC_SSEL = 653,
 
     //MPS2 Uart
-    CONSOLE_TX  = 400,
-    CONSOLE_RX  = 401,
+    USBTX  = 400,
+    USBRX  = 401,
     XB_TX = 402,
     XB_RX = 403,
     UART_TX2 = 404,
